@@ -26,8 +26,15 @@ function getBigrams(input) {
   Plotly.newPlot(chart,graphs,{});
 }
 
+function modelTable(input) {
+  var graphs = input;
+  //graphs.config = {'displayModeBar': false};
+  chart = document.querySelector('#model_output');
+  Plotly.newPlot(chart,graphs,{});
+}
+
 function createCheckBox(labels) {
-  let row = 1;
+  let row = 2;
   labels.forEach((elem) => {
     row += 1;
     const id = elem;
@@ -67,10 +74,15 @@ function send() {
   models.forEach(e => {
     if (e.checked) m.push(e.value);
   });
+  o = [];
+  options = document.querySelectorAll("#option");
+  options.forEach(e => {
+    if (e.checked) o.push(e.value);
+  });
   json_labels = JSON.stringify(l);
   json_models = JSON.stringify(m);
-  json_data = {"labels":l, "models": m};
-  console.log(json_data);
+  json_options = JSON.stringify(o);
+  json_data = {"labels":l, "models": m, "options": o};
   $('.center').css(
     "display", "flex"
   );
@@ -92,7 +104,12 @@ function send() {
       $('.center').css(
         "display", "none"
       );
-      $('#model_output').html(data);
+      $('.results').css(
+        "display", "block"
+      );
+      console.log(data);
+      //$('#model_output').html(data);
+      modelTable(data);
     });
     event.preventDefault();
   });

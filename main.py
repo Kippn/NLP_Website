@@ -44,8 +44,8 @@ from sklearn.preprocessing import LabelEncoder
 from collections import defaultdict
 from collections import Counter
 
-#from tqdm import tqdm
-#import tensorflow as tf
+# from tqdm import tqdm
+# import tensorflow as tf
 # from tensorflow.keras.preprocessing.text import Tokenizer
 # from tensorflow.keras.preprocessing.sequence import pad_sequences
 # from tensorflow.keras.models import Sequential
@@ -99,7 +99,9 @@ def showData():
     df = processText(uploaded_df, 'post').text_cleaning()
     bigram = showBigrams(df, 'class')
     labels = charts.getLabels()
+    #df.iloc[:100].to_csv(data_file_path)
     df.to_csv(data_file_path)
+
 
     return render_template('view.html', data=uploaded_df_html, distJSON=charts.plotDistribution(),
                            lengthJSON=charts.plotTextLength(), distplotJSON=charts.plotWordLength(),
@@ -115,12 +117,12 @@ def generateModels():
         if data:
             check_box_labels = data['labels']
             check_box_models = data['models']
+            check_box_options = data['options']
             if check_box_labels:
-                svm_model = trainModels(uploaded_df, check_box_labels, check_box_models)
-                model_pred = svm_model.train()
-                return jsonify(model_pred)
+                svm_model = trainModels(uploaded_df, check_box_labels, check_box_models, check_box_options)
+                model_pred = svm_model.plotOutput()
+                return (model_pred)
         return jsonify({'error': 'Missing data!'})
-        # return render_template('view.html', svm_pred=)
 
 
 class showCharts:
@@ -198,7 +200,6 @@ class showCharts:
 
         return lengthJSON
 
-    # @jit(target="cuda")
     def plotWordLength(self):
         hist_data = []
 
@@ -310,7 +311,7 @@ class showBigrams:
 
 
 class trainModels:
-    def __init__(self, df, labels, models):
+    def __init__(self, df, labels, models, options=['TfidfVectorizer']):
         self.y_test = None
         self.y_train = None
         self.X_test = None
@@ -318,6 +319,7 @@ class trainModels:
         self.df = df
         self.labels = labels
         self.models = models
+        self.options = options
 
     def processText(self):
         self.df = self.df[self.df['class'].isin(self.labels) == True]
@@ -340,50 +342,120 @@ class trainModels:
 
     def prepareData(self, text):
         self.processText()
-        X_train, X_test, y_train, y_test = train_test_split(self.df[text],
-                                                            self.df['class'],
-                                                            test_size=0.2,
-                                                            random_state=42)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df[text],
+                                                                                self.df['class'],
+                                                                                test_size=0.2,
+                                                                                random_state=42)
 
         Encoder = LabelEncoder()
-        self.y_train = Encoder.fit_transform(y_train)
-        self.y_test = Encoder.fit_transform(y_test)
-        tfidfVec = TfidfVectorizer(max_features=5000)
-        tfidfVec.fit(self.df[text])
+        self.y_train = Encoder.fit_transform(self.y_train)
+        self.y_test = Encoder.fit_transform(self.y_test)
+        vectorizer = {}
 
-        self.X_train = tfidfVec.transform(X_train)
-        self.X_test = tfidfVec.transform(X_test)
+        if 'TfidfVectorizer' in self.options:
+            t = {'TfidfVectorizer': TfidfVectorizer(max_features=5000)}
+            vectorizer.update(t)
 
-    def trainSVM(self):
+        if 'CountVectorizer' in self.options:
+            t = {'CountVectorizer': CountVectorizer(max_features=5000)}
+            vectorizer.update(t)
+
+        for vec in vectorizer:
+            vectorizer[vec].fit(self.df[text])
+        return vectorizer
+
+    def trainSVM(self, vectorizer):
         model_svm = svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto')
-        model_svm.fit(self.X_train, self.y_train)
+        predictions = []
+        output = {}
+        for vec in vectorizer.keys():
+            X_train = vectorizer[vec].transform(self.X_train)
+            X_test = vectorizer[vec].transform(self.X_test)
+            model_svm.fit(X_train, self.y_train)
+            pred = model_svm.predict(X_test)
+            predictions.append(pred)
+            output.update({f'Accuracy Score {vec}': f'{round(accuracy_score(self.y_test, pred) * 100, 2)} %'})
+            if len(self.labels) == 2:
+                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
+                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="binary") * 100, 2)} %'})
+            else:
+                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
 
-        pred_svm = model_svm.predict(self.X_test)
-
-        return f'Accuracy Score SVM: "{round(accuracy_score(self.y_test, pred_svm) * 100, 2)}" \n', \
-               f'Precision Score SVM: "{round(precision_score(self.y_test, pred_svm) * 100, 2)}" \n', \
-               f'F1 Score SVM: "{round(f1_score(self.y_test, pred_svm, average="binary") * 100, 2)}" \n'
-
-    def trainNaiveBayes(self):
-        model_naive = naive_bayes.MultinomialNB()
-        model_naive.fit(self.X_train, self.y_train)
-
-        pred_svm = model_naive.predict(self.X_test)
-
-        return f'Accuracy Score NB: "{round(accuracy_score(self.y_test, pred_svm) * 100, 2)}" \n', \
-               f'Precision Score NB: "{round(precision_score(self.y_test, pred_svm) * 100, 2)}" \n', \
-               f'F1 Score NB: "{round(f1_score(self.y_test, pred_svm, average="binary") * 100, 2)}" \n'
-
-    def train(self):
-        self.prepareData('text_final')
-        output = []
-        if 'SVM' in self.models:
-            output.append(self.trainSVM())
-
-        if 'Naive' in self.models:
-            output.append(self.trainNaiveBayes())
 
         return output
+
+    def trainNaiveBayes(self, vectorizer):
+        model_naive = naive_bayes.MultinomialNB()
+
+        predictions = []
+        output = {}
+        for vec in vectorizer.keys():
+            X_train = vectorizer[vec].transform(self.X_train)
+            X_test = vectorizer[vec].transform(self.X_test)
+            model_naive.fit(X_train, self.y_train)
+            pred = model_naive.predict(X_test)
+            predictions.append(pred)
+            output.update({f'Accuracy Score {vec}': f'{round(accuracy_score(self.y_test, pred) * 100, 2)} %'})
+            if len(self.labels) == 2:
+                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
+                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="binary") * 100, 2)} %'})
+            else:
+                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+
+        return output
+
+    def train(self):
+        vectorizer = self.prepareData('text_final')
+        output = {}
+        if 'SVM' in self.models:
+            output['SVM'] = self.trainSVM(vectorizer)
+
+        if 'Naive Bayes' in self.models:
+            output['Naive Bayes'] = self.trainNaiveBayes(vectorizer)
+
+        return output
+
+    def plotOutput(self):
+        out = self.train()
+        header = list(out.keys())
+        cols = []
+        values = []
+
+        for head in header:
+            temp = out[head].keys()
+            v = []
+            for t in temp:
+                cols.append(t)
+                v.append(out[head][t])
+            values.append(v)
+        cols = list(set(cols))
+
+        table_data = [cols] + values
+        header.insert(0, 'Metrics')
+
+        fig = go.Figure(data=[go.Table(
+            header=dict(
+                values=header,
+                line_color='rgb(26, 147, 218)',
+                fill_color='rgb(0, 90, 143)',
+                font=dict(color='white', size=25),
+                height=40
+            ),
+            cells=dict(
+                values=table_data,
+                line_color='rgb(26, 147, 218)',
+                fill_color='rgb(174, 224, 253)',
+                font=dict(color='white', size=20),
+                height=30
+            )
+        ),
+        ])
+
+        modelsJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        return modelsJSON
 
 
 if __name__ == "__main__":

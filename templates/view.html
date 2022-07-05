@@ -24,14 +24,17 @@
     <div id='chartWordLength'></div>
     <div id='chartBigrams'></div>
   </div>
-  <div class="model_div">
-    <form class="model_form">
-        <legend class="label_select">Select labels to train</legend>
-        <div class="labels_div"></div>
 
-        <legend class="model_select">Select ML Models</legend>
-       
+  <div class="model_div">
+
+    <form class="model_form">
+
+        <div class="labels_div">
+          <legend class="label_select">Select labels to train</legend>
+        </div>
+
         <div class="models_div">
+          <legend class="model_select">Select ML Models</legend>
           <label class="checkbox_label label_SVM">
             SVM
             <input type="checkbox" id="model", value="SVM">
@@ -40,13 +43,29 @@
 
           <label class="checkbox_label label_Naive">
             Naive Bayes
-            <input type="checkbox" id="model", value="Naive">
+            <input type="checkbox" id="model", value="Naive Bayes">
+            <span class="checkmark"></span>
+          </label>
+        </div>
+
+        <div class="options_div">
+          <legend class="option_select">Select Vectorizer</legend>
+          <label class="checkbox_label label_Tfidf">
+            TfidfVectorizer
+            <input type="checkbox" id="option", value="TfidfVectorizer">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_Count">
+            CountVectorizer
+            <input type="checkbox" id="option", value="CountVectorizer">
             <span class="checkmark"></span>
           </label>
         </div>
 
         <button class="submit_selection">Submit</button>
     </form>
+
     <div class="center">
       <div class="wave"></div>
       <div class="wave"></div>
@@ -59,9 +78,11 @@
       <div class="wave"></div>
       <div class="wave"></div>
     </div>
-   <h2>Results</h2>
+
+   <h2 class="results">Results</h2>
    <p id="model_output"></p>
   </div>
+
     </body>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js"></script>
