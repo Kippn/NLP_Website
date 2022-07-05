@@ -1,0 +1,360 @@
+body, html{
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+}
+
+.main_div {
+    width: 100%;
+    height: 100%;
+    margin: 0 auto;
+    padding: 0;
+    display: grid;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+}
+
+.headline {
+    color: #377ba8;
+    margin: 0 auto;
+    padding: 0;
+    font-size: 5vw;
+    grid-row: 1;
+}
+
+.second_headline {
+    color: #377ba8;
+    margin: 0 auto;
+    padding: 0;
+    font-size: 3vw;
+    grid-row: 2;
+}
+
+.csv_upload_form {
+    margin: 0 auto;
+    padding: 0;
+    grid-row: 3;
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+    display: grid;
+}
+
+
+input[type="file"] {
+    display: none;
+}
+
+input[type="submit"] {
+    display: none;
+}
+
+.load_csv {
+    background-color: rgb(0, 90, 143);
+    grid-row: 1;
+}
+
+.submit_csv {
+    background-color: rgb(121, 0, 0);
+    grid-row: 2;
+}
+
+.show_csv {
+    background-color: rgb(121, 0, 0);
+}
+
+.upload_button {
+    border: 2px double #ccc;
+    border-radius: 10px;
+    display: inline-block;
+    text-align: center;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 2vw;
+    font-weight: bold;
+    color: #fff;
+    transition: all 0.5s;
+}
+
+.load_csv:hover {
+    background-color: rgb(26, 147, 218);
+}
+
+
+.block_click {
+    pointer-events: none;
+}
+
+.show_csv_form {
+    margin: 0 auto;
+    padding: 0;
+    grid-row: 4;
+}
+
+
+
+
+
+
+/* view.html */
+
+
+
+.table_div {
+    display: grid;
+}
+
+.table_div h1 {
+    grid-row: 1;
+}
+
+.table_div p {
+    grid-row: 2;
+}
+
+table.dataframe, .dataframe th, .dataframe td {
+  border: none;
+  border-bottom: 1px solid #C8C8C8;
+  border-collapse: collapse;
+  text-align:left;
+  padding: 10px;
+  margin-bottom: 40px;
+  font-size: 0.9em;
+  grid-row: 3;
+}
+
+tr:nth-child(odd)   {
+    background-color:#eee;
+}
+tr:nth-child(even)	{
+    background-color:#fff;
+}
+
+tr:hover {
+    background-color: #377ba8;
+}
+
+
+.chart_div {
+    display: grid;
+}
+
+.chart_div h1 {
+    grid-row: 1;
+}
+
+#chartDistribution {
+    grid-row: 2;
+}
+
+#chart_div h2 {
+    grid-row: 3;
+}
+
+#chartTextLength {
+    grid-row: 4;
+}
+
+#chartWordLengthchartWordLength {
+    grid-row: 5;
+}
+
+#chartBigrams {
+    grid-row: 6;
+}
+
+.model_div {
+    display: grid;
+}
+
+.model_form {
+    display: grid;
+    grid-row: 1;
+}
+
+.label_select {
+    grid-row: 1;
+    grid-column: 1 / 5;
+}
+
+.labels_div {
+    display: grid;
+    grid-row: 2;
+    grid-column: 1 / 3;
+}
+
+.model_select {
+    grid-row: 3;
+    grid-column: 1 / 5;
+}
+
+.models_div {
+    display: grid;
+    grid-row: 4;
+    grid-column: 1 / 3;
+}
+
+.label_SVM {
+    grid-row: 1;
+}
+
+.label_Naive {
+    grid-row: 2;
+}
+
+.submit_selection {
+    border: 2px double #ccc;
+    border-radius: 10px;
+    display: inline-block;
+    text-align: center;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 2vw;
+    font-weight: bold;
+    color: #fff;
+    transition: all 0.5s;
+    background-color: rgb(0, 90, 143);
+    grid-row: 5;
+    grid-column: 1;
+}
+
+.submit_selection:hover {
+    background-color: rgb(26, 147, 218);
+}
+
+/* Customize the label (the container) */
+.checkbox_label {
+    display: block;
+    position: relative;
+    padding-left: 35px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-size: 22px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Hide the browser's default checkbox */
+  .checkbox_label input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+  
+  /* Create a custom checkbox */
+  .checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 25px;
+    width: 25px;
+    background-color: #eee;
+  }
+  
+  /* On mouse-over, add a grey background color */
+  .checkbox_label:hover input ~ .checkmark {
+    background-color: #ccc;
+  }
+  
+  /* When the checkbox is checked, add a blue background */
+  .checkbox_label input:checked ~ .checkmark {
+    background-color: rgb(26, 147, 218);
+  }
+  
+  /* Create the checkmark/indicator (hidden when not checked) */
+  .checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+  }
+  
+  /* Show the checkmark when checked */
+  .checkbox_label input:checked ~ .checkmark:after {
+    display: block;
+  }
+  
+  /* Style the checkmark/indicator */
+  .checkbox_label .checkmark:after {
+    left: 9px;
+    top: 5px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    -webkit-transform: rotate(45deg);
+    -ms-transform: rotate(45deg);
+    transform: rotate(45deg);
+  }
+
+
+
+.center {
+    height: 10%;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+    grid-row: 2;
+  }
+  .wave {
+    width: 5px;
+    height: 100px;
+    background: linear-gradient(45deg, cyan, #fff);
+    margin: 10px;
+    animation: wave 1s linear infinite;
+    border-radius: 20px;
+  }
+  .wave:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+  .wave:nth-child(3) {
+    animation-delay: 0.2s;
+  }
+  .wave:nth-child(4) {
+    animation-delay: 0.3s;
+  }
+  .wave:nth-child(5) {
+    animation-delay: 0.4s;
+  }
+  .wave:nth-child(6) {
+    animation-delay: 0.5s;
+  }
+  .wave:nth-child(7) {
+    animation-delay: 0.6s;
+  }
+  .wave:nth-child(8) {
+    animation-delay: 0.7s;
+  }
+  .wave:nth-child(9) {
+    animation-delay: 0.8s;
+  }
+  .wave:nth-child(10) {
+    animation-delay: 0.9s;
+  }
+  
+  @keyframes wave {
+    0% {
+      transform: scale(0);
+    }
+    50% {
+      transform: scale(1);
+    }
+    100% {
+      transform: scale(0);
+    }
+  }
+
+.model_div h2 {
+    grid-row: 3;
+}
+
+#model_output {
+    grid-row: 4;
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename= 'style.css')}}">
+  <title>Document</title>
+</head>
+<body>
+  <h1>Flask Test</h1>
+  <h2>File Upload</h2>
+  <form action="" method="POST" enctype="multipart/form-data">
+    <p><input type="file" id="uploaded_filed" name="file", accept=".csv"></p>
+    <p><input type="submit" value="Submit"></p>
+  </form>
+  <br>
+  <p style="color:green;">file uploaded successfully</p>
+    <form action="/show_data">
+        <input type="submit" value="Show CSV" />
+    </form>
+
+</body>
+</html>
