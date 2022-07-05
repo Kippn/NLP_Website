@@ -7,21 +7,13 @@ import string
 import re
 import gensim
 import json
-from numba import jit, cuda
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.figure_factory import create_distplot
-import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
 
 import nltk
-
 from nltk.util import ngrams
 from nltk import pos_tag
 from nltk.tokenize import word_tokenize
@@ -52,8 +44,8 @@ from sklearn.preprocessing import LabelEncoder
 from collections import defaultdict
 from collections import Counter
 
-from tqdm import tqdm
-import tensorflow as tf
+#from tqdm import tqdm
+#import tensorflow as tf
 # from tensorflow.keras.preprocessing.text import Tokenizer
 # from tensorflow.keras.preprocessing.sequence import pad_sequences
 # from tensorflow.keras.models import Sequential
@@ -368,9 +360,9 @@ class trainModels:
 
         pred_svm = model_svm.predict(self.X_test)
 
-        return f'Accuracy Score SVM: "{round(accuracy_score(self.y_test, pred_svm) * 100,2)}" \n', \
-               f'Precision Score SVM: "{round(precision_score(self.y_test, pred_svm) * 100,2)}" \n', \
-               f'F1 Score SVM: "{round(f1_score(self.y_test, pred_svm, average="binary") * 100,2)}" \n'
+        return f'Accuracy Score SVM: "{round(accuracy_score(self.y_test, pred_svm) * 100, 2)}" \n', \
+               f'Precision Score SVM: "{round(precision_score(self.y_test, pred_svm) * 100, 2)}" \n', \
+               f'F1 Score SVM: "{round(f1_score(self.y_test, pred_svm, average="binary") * 100, 2)}" \n'
 
     def trainNaiveBayes(self):
         model_naive = naive_bayes.MultinomialNB()
@@ -378,9 +370,9 @@ class trainModels:
 
         pred_svm = model_naive.predict(self.X_test)
 
-        return f'Accuracy Score NB: "{round(accuracy_score(self.y_test, pred_svm) * 100,2)}" \n', \
-               f'Precision Score NB: "{round(precision_score(self.y_test, pred_svm) * 100,2)}" \n', \
-               f'F1 Score NB: "{round(f1_score(self.y_test, pred_svm, average="binary") * 100,2)}" \n'
+        return f'Accuracy Score NB: "{round(accuracy_score(self.y_test, pred_svm) * 100, 2)}" \n', \
+               f'Precision Score NB: "{round(precision_score(self.y_test, pred_svm) * 100, 2)}" \n', \
+               f'F1 Score NB: "{round(f1_score(self.y_test, pred_svm, average="binary") * 100, 2)}" \n'
 
     def train(self):
         self.prepareData('text_final')
