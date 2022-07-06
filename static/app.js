@@ -64,6 +64,12 @@ function createCheckBox(labels) {
 
 
 function send() {
+  $('.center').css(
+    "display", "flex"
+  );
+  
+  $("html, body").animate({ scrollTop: $(document).height()-$(window).height() });
+ 
   labels = document.querySelectorAll("#label");
   l = [];
   labels.forEach(e => {
@@ -83,9 +89,7 @@ function send() {
   json_models = JSON.stringify(m);
   json_options = JSON.stringify(o);
   json_data = {"labels":l, "models": m, "options": o};
-  $('.center').css(
-    "display", "flex"
-  );
+
   $('.model_form').on('submit', function(event) {
     $.ajax({
       type: 'POST',
