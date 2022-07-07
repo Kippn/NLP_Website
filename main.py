@@ -1,3 +1,5 @@
+# imports
+
 from flask import Flask, jsonify, render_template, request, redirect, url_for, abort, session, Response
 import pandas as pd
 import numpy as np
@@ -68,11 +70,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = 'This is your secret key to utilize session in Flask'
 
 
+# flask index route
 @app.route('/')
 def index():
     return render_template('index.html')
 
 
+# upload and safe .csv file in directory
 @app.route('/', methods=['POST', 'GET'])
 def upload_file():
     if request.method == 'POST':
@@ -85,6 +89,7 @@ def upload_file():
         return '', 204
 
 
+# redirect to /show_data when show csv is clicked and calculate all charts
 @app.route('/show_data')
 def showData():
     # Retrieving uploaded file path from session
@@ -99,15 +104,15 @@ def showData():
     df = processText(uploaded_df, 'post').text_cleaning()
     bigram = showBigrams(df, 'class')
     labels = charts.getLabels()
-    #df.iloc[:100].to_csv(data_file_path)
-    df.to_csv(data_file_path)
-
+    df.iloc[:100].to_csv(data_file_path)
+    #df.to_csv(data_file_path)
 
     return render_template('view.html', data=uploaded_df_html, distJSON=charts.plotDistribution(),
                            lengthJSON=charts.plotTextLength(), distplotJSON=charts.plotWordLength(),
                            bigramJSON=bigram.plot_bigrams(), labels=labels)
 
 
+# generate models if needed options are selected
 @app.route('/generateModels', methods=['GET', 'POST'])
 def generateModels():
     if request.method == 'POST':
@@ -125,6 +130,7 @@ def generateModels():
         return jsonify({'error': 'Missing data!'})
 
 
+# calculate charts
 class showCharts:
     def __init__(self, df, target):
         self.df = df
@@ -225,6 +231,7 @@ class showCharts:
         return j
 
 
+# text cleaning
 class processText:
     def __init__(self, df, text):
         self.df = df
@@ -283,6 +290,7 @@ class processText:
         return self.df
 
 
+# top bigrams bar chart
 class showBigrams:
     def __init__(self, df, target):
         self.df = df
@@ -310,6 +318,7 @@ class showBigrams:
         return bigramsJSON
 
 
+# ML model training
 class trainModels:
     def __init__(self, df, labels, models, options=['TfidfVectorizer']):
         self.y_test = None
@@ -321,6 +330,7 @@ class trainModels:
         self.models = models
         self.options = options
 
+    # further preprocess text -> tokenizer and lemmatizer
     def processText(self):
         self.df = self.df[self.df['class'].isin(self.labels) == True]
         self.df.reset_index(inplace=True, drop=True)
@@ -340,6 +350,7 @@ class trainModels:
                     Final_words.append(word_Final)
             self.df.loc[i, 'text_final'] = str(Final_words)
 
+    # train test split and vectorizer defining
     def prepareData(self, text):
         self.processText()
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df[text],
@@ -364,6 +375,7 @@ class trainModels:
             vectorizer[vec].fit(self.df[text])
         return vectorizer
 
+    # train SVM
     def trainSVM(self, vectorizer):
         model_svm = svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto')
         predictions = []
@@ -376,15 +388,18 @@ class trainModels:
             predictions.append(pred)
             output.update({f'Accuracy Score {vec}': f'{round(accuracy_score(self.y_test, pred) * 100, 2)} %'})
             if len(self.labels) == 2:
-                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
+                output.update({
+                                  f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
                 output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="binary") * 100, 2)} %'})
             else:
-                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
-                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
-
+                output.update({
+                    f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+                output.update(
+                    {f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
 
         return output
 
+    # train Naive Bayes
     def trainNaiveBayes(self, vectorizer):
         model_naive = naive_bayes.MultinomialNB()
 
@@ -398,14 +413,18 @@ class trainModels:
             predictions.append(pred)
             output.update({f'Accuracy Score {vec}': f'{round(accuracy_score(self.y_test, pred) * 100, 2)} %'})
             if len(self.labels) == 2:
-                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
+                output.update({
+                                  f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
                 output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="binary") * 100, 2)} %'})
             else:
-                output.update({f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
-                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+                output.update({
+                                  f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+                output.update(
+                    {f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
 
         return output
 
+    # use trainSVM and trainNaive if the user selected one or both
     def train(self):
         vectorizer = self.prepareData('text_final')
         output = {}
@@ -417,6 +436,7 @@ class trainModels:
 
         return output
 
+    # return a table with the calculated metrics
     def plotOutput(self):
         out = self.train()
         header = list(out.keys())
