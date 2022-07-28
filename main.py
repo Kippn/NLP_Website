@@ -1,13 +1,12 @@
 # imports
 
-from flask import Flask, jsonify, render_template, request, redirect, url_for, abort, session, Response
+from flask import Flask, jsonify, render_template, request, session
 import pandas as pd
 import numpy as np
 import os
 import spacy
 import string
 import re
-import gensim
 import json
 import plotly
 import plotly.express as px
@@ -16,47 +15,32 @@ from plotly.subplots import make_subplots
 from plotly.figure_factory import create_distplot
 
 import nltk
-from nltk.util import ngrams
 from nltk import pos_tag
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
+
+from werkzeug.utils import secure_filename
+
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+from sklearn import svm, naive_bayes
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+
+from collections import defaultdict
+
+import warnings
 
 nltk.download('stopwords')
 nltk.download('punkt')
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 nltk.download('averaged_perceptron_tagger')
-
-from werkzeug.utils import secure_filename
-
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.model_selection import train_test_split
-from sklearn.decomposition import PCA, TruncatedSVD
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, recall_score, precision_score, \
-    f1_score
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.base import TransformerMixin, BaseEstimator
-from sklearn import model_selection, metrics, svm, naive_bayes
-from sklearn.utils import shuffle
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import LabelEncoder
-
-from collections import defaultdict
-from collections import Counter
-
-# from tqdm import tqdm
-# import tensorflow as tf
-# from tensorflow.keras.preprocessing.text import Tokenizer
-# from tensorflow.keras.preprocessing.sequence import pad_sequences
-# from tensorflow.keras.models import Sequential
-# from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D, Dropout
-# from tensorflow.keras.initializers import Constant
-# from tensorflow.keras.optimizers import Adam
-
-import warnings
-
 stop = set(stopwords.words('english'))
 nlp = spacy.load("en_core_web_lg")
 
@@ -77,21 +61,27 @@ def index():
 
 
 # upload and safe .csv file in directory
-@app.route('/', methods=['POST', 'GET'])
+@app.route('/', methods=['POST'])
 def upload_file():
-    if request.method == 'POST':
-        if request.files:
-            # upload file
-            uploaded_file = request.files['file']
-            data_filename = secure_filename(uploaded_file.filename)
-            uploaded_file.save(os.path.join(app.config['UPLOAD_FOLDER'], data_filename))
-            session['uploaded_data_file_path'] = os.path.join(app.config['UPLOAD_FOLDER'], data_filename)
-        return '', 204
+    if request.files:
+        # upload file
+        uploaded_file = request.files['file']
+        data_filename = secure_filename(uploaded_file.filename)
+        if data_filename.__contains__('.csv'):
+            uploaded_file = pd.read_csv(uploaded_file, index_col=0)
+        if data_filename.__contains__('.tsv'):
+            uploaded_file = pd.read_csv(uploaded_file, delimiter='\t')
+        uploaded_file.dropna(inplace=True)
+        uploaded_file.reset_index(drop=True, inplace=True)
+        uploaded_file.to_csv(os.path.join(app.config['UPLOAD_FOLDER'], data_filename))
+        session['uploaded_data_file_path'] = os.path.join(app.config['UPLOAD_FOLDER'], data_filename)
+
+    return '', 204
 
 
-# redirect to /show_data when show csv is clicked and calculate all charts
-@app.route('/show_data')
-def showData():
+# redirect to /select, return columns and head of data
+@app.route('/select', methods=['POST'])
+def select():
     # Retrieving uploaded file path from session
     data_file_path = session.get('uploaded_data_file_path', None)
 
@@ -100,42 +90,72 @@ def showData():
 
     # pandas dataframe to html table flask
     uploaded_df_html = uploaded_df.head(10).to_html()
-    charts = showCharts(uploaded_df, 'class')
-    df = processText(uploaded_df, 'post').text_cleaning()
-    bigram = showBigrams(df, 'class')
-    labels = charts.getLabels()
-    df.iloc[:100].to_csv(data_file_path)
-    #df.to_csv(data_file_path)
+    charts = showCharts(uploaded_df)
+    features = charts.getFeatures()
 
-    return render_template('view.html', data=uploaded_df_html, distJSON=charts.plotDistribution(),
-                           lengthJSON=charts.plotTextLength(), distplotJSON=charts.plotWordLength(),
-                           bigramJSON=bigram.plot_bigrams(), labels=labels)
+    return render_template('select.html', data=uploaded_df_html, features=features)
 
 
-# generate models if needed options are selected
-@app.route('/generateModels', methods=['GET', 'POST'])
-def generateModels():
-    if request.method == 'POST':
-        data_file_path = session.get('uploaded_data_file_path', None)
-        uploaded_df = pd.read_csv(data_file_path, index_col=0)
-        data = request.json
-        if data:
-            check_box_labels = data['labels']
-            check_box_models = data['models']
-            check_box_options = data['options']
-            if check_box_labels:
-                svm_model = trainModels(uploaded_df, check_box_labels, check_box_models, check_box_options)
-                model_pred = svm_model.plotOutput()
-                return (model_pred)
-        return jsonify({'error': 'Missing data!'})
+# ajax route, returns charts and labels
+@app.route('/showData', methods=['POST'])
+def showData():
+    data_file_path = session.get('uploaded_data_file_path', None)
+    uploaded_df = pd.read_csv(data_file_path, index_col=0)
+    data = request.json
+    if data:
+        check_box_target = data['target'][0]
+        check_box_text = data['text'][0]
+        check_box_chart = data['chart']
+        session['target'] = check_box_target
+        session['text'] = check_box_text
+        charts = showCharts(uploaded_df, check_box_text, check_box_target)
+        df = processText(uploaded_df, check_box_text).text_cleaning()
+        df.to_csv(data_file_path)
+        # df.iloc[:1000].to_csv(data_file_path)
+        out = {}
+        if 'Bi-Grams' in check_box_chart:
+            bigram = showBigrams(df, check_box_text, check_box_target).plot_bigrams()
+            out.update({'bigram': bigram})
+        if 'Distribution' in check_box_chart:
+            dist = charts.plotDistribution()
+            out.update({'dist': dist})
+        if 'Text Length' in check_box_chart:
+            textLength = charts.plotTextLength()
+            out.update({'textLength': textLength})
+        if 'Word Length' in check_box_chart:
+            wordLength = charts.plotWordLength()
+            out.update({'wordLength': wordLength})
+
+        labels = charts.getLabels()
+        out.update({'labels': labels})
+
+        return out
+    return jsonify({'error': 'Missing data!'})
+
+
+# redirect to view.html, calculate selected models with options
+@app.route('/view', methods=['POST'])
+def view():
+    data_file_path = session.get('uploaded_data_file_path', None)
+    uploaded_df = pd.read_csv(data_file_path, index_col=0)
+    check_box_labels = request.form.getlist('label')
+    check_box_models = request.form.getlist('model')
+    check_box_options = request.form.getlist('options')
+    models = trainModels(uploaded_df, session['text'], session['target'], check_box_labels, check_box_models,
+                         check_box_options)
+    model_pred, labels = models.plotOutput()
+    return render_template('view.html', model=model_pred, labels=labels)
 
 
 # calculate charts
 class showCharts:
-    def __init__(self, df, target):
+    def __init__(self, df, text=0, target=0):
         self.df = df
-        self.target = target
-        self.labels = df[target].unique()
+        if target != 0:
+            self.target = target
+            self.labels = df[target].unique()
+        if text != 0:
+            self.text = text
 
     def plotDistribution(self):
         lengths = []
@@ -150,7 +170,10 @@ class showCharts:
                                       y=1.02,
                                       xanchor="right",
                                       x=1
-                                      ))
+                                      ),
+                          paper_bgcolor='#FFFFFF',
+                          plot_bgcolor='#D9D9D9',
+                          font=dict(color='#284B63', family="Lucida Console", size=20))
         distJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
         return distJSON
@@ -168,7 +191,7 @@ class showCharts:
 
         for label in self.labels:
             fig.add_trace(go.Histogram(
-                x=self.df[self.df[self.target] == label]['post'].str.len(),
+                x=self.df[self.df[self.target] == label][self.text].str.len(),
                 name=label,
                 marker=dict(color=colors[np.where(self.labels == label)[0][0]]),
                 legendgroup="group"
@@ -177,7 +200,7 @@ class showCharts:
             )
 
             fig.add_trace(go.Histogram(
-                x=self.df[self.df[self.target] == label]['post'].str.split().map(lambda x: len(x)),
+                x=self.df[self.df[self.target] == label][self.text].str.split().map(lambda x: len(x)),
                 name=label,
                 marker=dict(color=colors[np.where(self.labels == label)[0][0]]),
                 legendgroup="group",
@@ -191,7 +214,10 @@ class showCharts:
                                       y=1.02,
                                       xanchor="right",
                                       x=1
-                                      ))
+                                      ),
+                          paper_bgcolor='#FFFFFF',
+                          plot_bgcolor='#D9D9D9',
+                          font=dict(color='#284B63', family="Lucida Console", size=20))
 
         fig.update_traces(opacity=0.75)
 
@@ -208,9 +234,9 @@ class showCharts:
 
     def plotWordLength(self):
         hist_data = []
-
+        self.df.dropna(inplace=True)
         for label in self.labels:
-            word = self.df[self.df[self.target] == label]['post'].str.split().apply(lambda x: [len(i) for i in x])
+            word = self.df[self.df[self.target] == label][self.text].str.split().apply(lambda x: [len(i) for i in x])
             hist_data.append(word.map(lambda x: np.mean(x)))
 
         fig = create_distplot(hist_data, self.labels, bin_size=0.2)
@@ -220,21 +246,26 @@ class showCharts:
                                                                 y=1.02,
                                                                 xanchor="right",
                                                                 x=1
-                                                                ))
+                                                                ),
+                          paper_bgcolor='#FFFFFF',
+                          plot_bgcolor='#D9D9D9',
+                          font=dict(color='#284B63', family="Lucida Console", size=20))
 
         distplotJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
         return distplotJSON
 
     def getLabels(self):
-        j = pd.Series(self.labels).to_json(orient='values')
-        return j
+        return pd.Series(self.labels).to_json(orient='values')
+
+    def getFeatures(self):
+        return pd.Series(self.df.columns.values).to_json(orient='values')
 
 
 # text cleaning
 class processText:
     def __init__(self, df, text):
-        self.df = df
+        self.df = df.copy()
         self.text = text
 
     @staticmethod
@@ -261,12 +292,7 @@ class processText:
 
     @staticmethod
     def remove_punct(text):
-        for punc in list(string.punctuation):
-            if punc in text:
-                text = text.replace(punc, '')
-        return text.strip()
-        # table = str.maketrans('', ' ', string.punctuation)
-        # return text.translate(table)
+        return text.translate(str.maketrans('', '', string.punctuation))
 
     @staticmethod
     def remove_rt(text):
@@ -275,27 +301,32 @@ class processText:
     @staticmethod
     def stopword(text):
         text_tokens = word_tokenize(text)
-        tokens_without_sw = [word for word in text_tokens if not word in stop]
+        tokens_without_sw = [word for word in text_tokens if word not in stop]
         return " ".join(tokens_without_sw)
 
     def text_cleaning(self):
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_URL(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_html(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_emoji(x))
-        # self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_punct(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_rt(x))
+        self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_punct(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.stopword(x))
+        self.df.replace(to_replace=r'^s*$', value=np.nan, regex=True, inplace=True)
+        self.df.replace(to_replace=r'^$', value=np.nan, regex=True, inplace=True)
+        self.df.dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
+        self.df = self.df.astype(str)
 
         return self.df
 
 
-# top bigrams bar chart
+# top bi-grams bar chart
 class showBigrams:
-    def __init__(self, df, target):
+    def __init__(self, df, text, target):
         self.df = df
         self.target = target
-        self.labels = df[target].unique()
+        self.labels = df[self.target].unique()
+        self.text = text
 
     @staticmethod
     def get_top_bi_grams(corpus, n=None):
@@ -307,41 +338,78 @@ class showBigrams:
         return words_freq[:n]
 
     def plot_bigrams(self):
-        bigrams = self.get_top_bi_grams(self.df['post'], 15)
+        bigrams = self.get_top_bi_grams(self.df[self.text], 15)
         y, x = map(list, zip(*bigrams))
         d = pd.DataFrame({'bi-gram': y, 'frequency': x})
         fig = px.bar(d, x='frequency', y='bi-gram', color='bi-gram', orientation='h')
-        fig.update_layout(title_text='top bi-grams', showlegend=False)
+        fig.update_layout(title_text='top bi-grams',
+                          showlegend=False,
+                          paper_bgcolor='#FFFFFF',
+                          plot_bgcolor='#D9D9D9',
+                          font=dict(color='#284B63', family="Lucida Console", size=15))
 
         bigramsJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
         return bigramsJSON
 
 
-# ML model training
+# generat colors for prediction table
+def generateColors(df):
+    maxValueIndex = df.idxmax(axis=1)
+    out = []
+    for col in df.columns:
+        temp = []
+        for row in range(len(df[col])):
+            if maxValueIndex[row] == col:
+                temp.append('#3C6E71')
+            else:
+                temp.append('#284B63')
+        out.append(temp)
+    out.insert(0, '#353535')
+    return out
+
+
+# calculate prediction table size depending on selected options
+def calcTableSize(columns, rows, base=200, height_per_row=50, height_head_line=40, width_per_column=330):
+    min_width = 1000
+    min_height = 500
+    total_height = 0 + base
+    total_width = columns * width_per_column
+    total_height += rows * height_per_row + height_head_line
+    if min_height > total_height:
+        total_height = min_height
+    if min_width > total_width:
+        total_width = min_width
+
+    return total_height, total_width
+
+
+# model training
 class trainModels:
-    def __init__(self, df, labels, models, options=['TfidfVectorizer']):
+    def __init__(self, df, text, target, labels, models, options=['TfidfVectorizer']):
         self.y_test = None
         self.y_train = None
         self.X_test = None
         self.X_train = None
-        self.df = df
+        self.df = df.astype(str)
+        self.text = text
+        self.target = target
         self.labels = labels
         self.models = models
         self.options = options
 
     # further preprocess text -> tokenizer and lemmatizer
     def processText(self):
-        self.df = self.df[self.df['class'].isin(self.labels) == True]
+        self.df = self.df[self.df[self.target].isin(self.labels) == True]
+        self.df[self.text].dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
-        self.df['post'].dropna(inplace=True)
-        self.df['post'] = [entry.lower() for entry in self.df['post']]
-        self.df['post'] = [word_tokenize(entry) for entry in self.df['post']]
+        self.df[self.text] = [entry.lower() for entry in self.df[self.text]]
+        self.df[self.text] = [word_tokenize(entry) for entry in self.df[self.text]]
         tag_map = defaultdict(lambda: wordnet.NOUN)
         tag_map['J'] = wordnet.ADJ
         tag_map['V'] = wordnet.VERB
         tag_map['R'] = wordnet.ADV
-        for i, entry in enumerate(self.df['post']):
+        for i, entry in enumerate(self.df[self.text]):
             Final_words = []
             word_Lemmatized = WordNetLemmatizer()
             for word, tag in pos_tag(entry):
@@ -351,10 +419,11 @@ class trainModels:
             self.df.loc[i, 'text_final'] = str(Final_words)
 
     # train test split and vectorizer defining
-    def prepareData(self, text):
+    def prepareData(self):
+        X, y = [], []
         self.processText()
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df[text],
-                                                                                self.df['class'],
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df['text_final'],
+                                                                                self.df[self.target],
                                                                                 test_size=0.2,
                                                                                 random_state=42)
 
@@ -367,115 +436,190 @@ class trainModels:
             t = {'TfidfVectorizer': TfidfVectorizer(max_features=5000)}
             vectorizer.update(t)
 
-        if 'CountVectorizer' in self.options:
-            t = {'CountVectorizer': CountVectorizer(max_features=5000)}
+        if 'N-Gram' in self.options:
+            t = {'N-Gram': CountVectorizer(max_features=5000)}
             vectorizer.update(t)
 
+        if 'GloVe' in self.options:
+            corpus = self.df['text_final'].values
+            c_vectorizer = CountVectorizer()
+            X = c_vectorizer.fit_transform(corpus)
+            CountVectorizedData = pd.DataFrame(X.toarray(), columns=c_vectorizer.get_feature_names())
+            CountVectorizedData[self.target] = self.df[self.target]
+
+            # Defining an empty dictionary to store the values
+            GloveWordVectors = {}
+
+            # Defining a function which takes text input and returns one vector for each sentence
+            def FunctionText2Vec(inpTextData):
+                # Converting the text to numeric data
+                X = c_vectorizer.transform(inpTextData)
+                CountVecData = pd.DataFrame(X.toarray(), columns=c_vectorizer.get_feature_names())
+
+                # Creating empty dataframe to hold sentences
+                W2Vec_Data = pd.DataFrame()
+
+                # Looping through each row for the data
+                for i in range(CountVecData.shape[0]):
+                    # initiating a sentence with all zeros
+                    Sentence = np.zeros(50)
+
+                    # Looping through each word in the sentence and if its present in
+                    # the Glove model then storing its vector
+                    for word in WordsVocab[CountVecData.iloc[i, :] >= 1]:
+                        if word in GloveWordVectors.keys():
+                            Sentence = Sentence + GloveWordVectors[word]
+                    # Appending the sentence to the dataframe
+                    W2Vec_Data = W2Vec_Data.append(pd.DataFrame([Sentence]))
+                return W2Vec_Data
+
+            # Reading Glove Data
+            with open('static/files/glove.6B.50d.txt', 'r', encoding="utf-8") as f:
+                for line in f:
+                    values = line.split()
+                    word = values[0]
+                    vector = np.array(values[1:], "float")
+                    GloveWordVectors[word] = vector
+
+            WordsVocab = CountVectorizedData.columns
+            W2Vec_Data = FunctionText2Vec(self.df['text_final'])
+
+            # Adding the target variable
+            W2Vec_Data.reset_index(inplace=True, drop=True)
+            W2Vec_Data[self.target] = CountVectorizedData[self.target]
+
+            # Assigning to DataForML variable
+            DataForML = W2Vec_Data
+            DataForML = DataForML.dropna()
+
+            # Separate Target Variable and Predictor Variables
+            TargetVariable = DataForML.columns[-1]
+            Predictors = DataForML.columns[:-1]
+
+            X = DataForML[Predictors].values
+            y = DataForML[TargetVariable].values
+
         for vec in vectorizer:
-            vectorizer[vec].fit(self.df[text])
-        return vectorizer
+            vectorizer[vec].fit(self.df['text_final'])
+        return vectorizer, X, y
 
-    # train SVM
-    def trainSVM(self, vectorizer):
-        model_svm = svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto')
-        predictions = []
+    # train Models
+    def trainPredictionModel(self, model, vectorizer, X_glove, y_glove):
         output = {}
         for vec in vectorizer.keys():
             X_train = vectorizer[vec].transform(self.X_train)
             X_test = vectorizer[vec].transform(self.X_test)
-            model_svm.fit(X_train, self.y_train)
-            pred = model_svm.predict(X_test)
-            predictions.append(pred)
-            output.update({f'Accuracy Score {vec}': f'{round(accuracy_score(self.y_test, pred) * 100, 2)} %'})
+            model.fit(X_train, self.y_train)
+            pred = model.predict(X_test)
+            output.update({f'Accuracy Score {vec}': (accuracy_score(self.y_test, pred))})
             if len(self.labels) == 2:
                 output.update({
-                                  f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
-                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="binary") * 100, 2)} %'})
+                    f'Precision Score {vec}': (precision_score(self.y_test, pred, average="binary"))})
+                output.update(
+                    {f'F1 Score {vec}': (f1_score(self.y_test, pred, average="binary"))})
             else:
                 output.update({
-                    f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+                    f'Precision Score {vec}': (precision_score(self.y_test, pred, average="weighted"))})
                 output.update(
-                    {f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
+                    {f'F1 Score {vec}': (f1_score(self.y_test, pred, average="weighted"))})
+
+        if len(X_glove) != 0:
+            PredictorScaler = MinMaxScaler()
+
+            # Storing the fit object for later reference
+            PredictorScalerFit = PredictorScaler.fit(X_glove)
+
+            # Generating the standardized values of X
+            X = PredictorScalerFit.transform(X_glove)
+
+            X_train, X_test, y_train, y_test = train_test_split(X, y_glove, test_size=0.2, random_state=42)
+
+            Encoder = LabelEncoder()
+            y_train = Encoder.fit_transform(y_train)
+            y_test = Encoder.fit_transform(y_test)
+
+            model.fit(X_train, y_train)
+            pred = model.predict(X_test)
+
+            output.update({'Accuracy Score GloVe': (accuracy_score(y_test, pred))})
+            if len(self.labels) == 2:
+                output.update({
+                    'Precision Score GloVe': (precision_score(y_test, pred, average="binary"))})
+                output.update(
+                    {'F1 Score GloVe': (f1_score(y_test, pred, average="binary"))})
+            else:
+                output.update({
+                    'Precision Score GloVe': (precision_score(y_test, pred, average="weighted"))})
+                output.update(
+                    {'F1 Score GloVe': (f1_score(y_test, pred, average="weighted"))})
 
         return output
 
-    # train Naive Bayes
-    def trainNaiveBayes(self, vectorizer):
-        model_naive = naive_bayes.MultinomialNB()
-
-        predictions = []
-        output = {}
-        for vec in vectorizer.keys():
-            X_train = vectorizer[vec].transform(self.X_train)
-            X_test = vectorizer[vec].transform(self.X_test)
-            model_naive.fit(X_train, self.y_train)
-            pred = model_naive.predict(X_test)
-            predictions.append(pred)
-            output.update({f'Accuracy Score {vec}': f'{round(accuracy_score(self.y_test, pred) * 100, 2)} %'})
-            if len(self.labels) == 2:
-                output.update({
-                                  f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="binary") * 100, 2)} %'})
-                output.update({f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="binary") * 100, 2)} %'})
-            else:
-                output.update({
-                                  f'Precision Score {vec}': f'{round(precision_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
-                output.update(
-                    {f'F1 Score {vec}': f'{round(f1_score(self.y_test, pred, average="weighted") * 100, 2)} %'})
-
-        return output
-
-    # use trainSVM and trainNaive if the user selected one or both
+    # use different models
     def train(self):
-        vectorizer = self.prepareData('text_final')
+        vectorized, X_glove, y_glove = self.prepareData()
         output = {}
         if 'SVM' in self.models:
-            output['SVM'] = self.trainSVM(vectorizer)
+            output['SVM'] = self.trainPredictionModel(svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto'),
+                                                      vectorized, X_glove, y_glove)
 
         if 'Naive Bayes' in self.models:
-            output['Naive Bayes'] = self.trainNaiveBayes(vectorizer)
+            output['Naive Bayes'] = self.trainPredictionModel(naive_bayes.MultinomialNB(), vectorized, X_glove, y_glove)
+
+        if 'Logistic Regression' in self.models:
+            output['Logistic Regression'] = self.trainPredictionModel(LogisticRegression(), vectorized, X_glove,
+                                                                      y_glove)
+
+        if 'Random Forest' in self.models:
+            output['Random Forest'] = self.trainPredictionModel(
+                RandomForestClassifier(n_estimators=100, random_state=100), vectorized, X_glove, y_glove)
 
         return output
 
     # return a table with the calculated metrics
     def plotOutput(self):
         out = self.train()
-        header = list(out.keys())
-        cols = []
-        values = []
+        df = pd.DataFrame(out)
+        df.index.name = "Metrics"
+        df.sort_index(inplace=True)
+        colors = generateColors(df)
+        df.reset_index(inplace=True)
+        df.rename(columns={'index': 'Metrics'}, inplace=True)
 
-        for head in header:
-            temp = out[head].keys()
-            v = []
-            for t in temp:
-                cols.append(t)
-                v.append(out[head][t])
-            values.append(v)
-        cols = list(set(cols))
-
-        table_data = [cols] + values
-        header.insert(0, 'Metrics')
+        height, width = calcTableSize(df.shape[1], df.shape[0])
 
         fig = go.Figure(data=[go.Table(
+            columnwidth=[1.5, 1],
             header=dict(
-                values=header,
-                line_color='rgb(26, 147, 218)',
-                fill_color='rgb(0, 90, 143)',
-                font=dict(color='white', size=25),
+                values=list(df.columns),
+                line_color='white',
+                fill_color='#353535',
+                font=dict(size=25),
+                align='center',
                 height=40
             ),
             cells=dict(
-                values=table_data,
-                line_color='rgb(26, 147, 218)',
-                fill_color='rgb(174, 224, 253)',
-                font=dict(color='white', size=20),
-                height=30
+                values=[df[col] for col in df.columns],
+                line_color='white',
+                fill=dict(color=colors),
+                font=dict(size=20),
+                align='center',
+                height=30,
+                format=["", ".2%"]
             )
         ),
         ])
-
+        fig.update_layout(
+            autosize=False,
+            height=height,
+            width=width,
+            paper_bgcolor='#FFFFFF',
+            plot_bgcolor='#D9D9D9',
+            font=dict(color='white', family="Lucida Console")
+        )
         modelsJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
-        return modelsJSON
+        return modelsJSON, self.labels
 
 
 if __name__ == "__main__":

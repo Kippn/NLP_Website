@@ -1,9 +1,141 @@
+/* General */
+
 body, html{
     width: 100%;
     margin: 0 auto;
     padding: 0;
-    font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+    font-family: "Lucida Console", "Lucida Grande", sans-serif;
+    background-color: #FFFFFF;
 }
+
+.checkbox_label {
+  display: block;
+  position: relative;
+  padding-left: 35px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-size: 22px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.checkbox_label input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 25px;
+  width: 25px;
+  background-color: #D9D9D9;
+}
+
+.checkbox_label:hover input ~ .checkmark {
+  background-color: #3C6E71;
+}
+
+.checkbox_label input:checked ~ .checkmark {
+  background-color: #284B63;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.checkbox_label input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.checkbox_label .checkmark:after {
+  left: 9px;
+  top: 5px;
+  width: 5px;
+  height: 10px;
+  border: solid #D9D9D9;
+  border-width: 0 3px 3px 0;
+  -webkit-transform: rotate(45deg);
+  -ms-transform: rotate(45deg);
+  transform: rotate(45deg);
+}
+
+.center {
+  height: 10%;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  margin-top: 15%;
+  grid-row: 4/5;
+  grid-column: 2 / 3;
+}
+
+.wave {
+  width: 5px;
+  height: 100px;
+  background: linear-gradient(45deg, #284B63, #3C6E71);
+  margin: 10px;
+  animation: wave 1s linear infinite;
+  border-radius: 20px;
+}
+.wave:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.wave:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.wave:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.wave:nth-child(5) {
+  animation-delay: 0.4s;
+}
+.wave:nth-child(6) {
+  animation-delay: 0.5s;
+}
+.wave:nth-child(7) {
+  animation-delay: 0.6s;
+}
+.wave:nth-child(8) {
+  animation-delay: 0.7s;
+}
+.wave:nth-child(9) {
+  animation-delay: 0.8s;
+}
+.wave:nth-child(10) {
+  animation-delay: 0.9s;
+}
+
+@keyframes wave {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0);
+  }
+}
+
+
+
+
+
+
+
+
+
+/* Index.html */
 
 .main_div {
     width: 100%;
@@ -14,22 +146,35 @@ body, html{
     text-align: center;
     justify-content: center;
     align-items: center;
+    color: #284B63;
 }
 
 .headline {
-    color: #377ba8;
-    margin: 0 auto;
+    margin: 1em auto;
     padding: 0;
     font-size: 5vw;
     grid-row: 1;
 }
 
 .second_headline {
-    color: #377ba8;
     margin: 0 auto;
     padding: 0;
     font-size: 3vw;
     grid-row: 2;
+}
+
+.upload_button {
+  border: 2px double #264653;
+  border-radius: 10px;
+  width: 100%;
+  display: inline-block;
+  text-align: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 2vw;
+  font-weight: bold;
+  color: #fff;
+  transition: all 0.5s;
 }
 
 .csv_upload_form {
@@ -43,7 +188,6 @@ body, html{
     display: grid;
 }
 
-
 input[type="file"] {
     display: none;
 }
@@ -53,45 +197,51 @@ input[type="submit"] {
 }
 
 .load_csv {
-    background-color: rgb(0, 90, 143);
+    background-color: #284B63;
     grid-row: 1;
-}
-
-.submit_csv {
-    background-color: rgb(121, 0, 0);
-    grid-row: 2;
-}
-
-.show_csv {
-    background-color: rgb(121, 0, 0);
-}
-
-.upload_button {
-    border: 2px double #ccc;
-    border-radius: 10px;
-    display: inline-block;
-    text-align: center;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 2vw;
-    font-weight: bold;
-    color: #fff;
-    transition: all 0.5s;
+    margin: 0 auto;
+    margin-top: 1em;
 }
 
 .load_csv:hover {
-    background-color: rgb(26, 147, 218);
+  transform: scale(1.1);
+  background-color: #3C6E71;
 }
 
+.submit_csv {
+    background-color: #353535;
+    grid-row: 2;
+    margin: 1em auto;
+}
+
+.submit_csv:hover {
+  transform: scale(1.1);
+}
+
+.show_csv {
+  background-color: #353535;
+  margin: 0 auto;
+  grid-row: 1;
+}
+
+.show_csv:hover {
+  transform: scale(1.1);
+  background-color: #3C6E71;
+}
 
 .block_click {
     pointer-events: none;
 }
 
 .show_csv_form {
-    margin: 0 auto;
-    padding: 0;
-    grid-row: 4;
+  margin: 0 auto;
+  padding: 0;
+  grid-row: 4;
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  display: grid;
 }
 
 
@@ -99,86 +249,153 @@ input[type="submit"] {
 
 
 
-/* view.html */
 
 
+/* select.html */
 
-.table_div {
-    display: grid;
+.main_div_select {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-items: center;
+  width: 100%;
 }
 
-.table_div h1 {
-    grid-row: 1;
+.select_div {
+  color: #264653;
 }
 
-.table_div p {
-    grid-row: 2;
+.select_div h1 {
+  text-align: center;
+  font-size: 3vw;
 }
 
-table.dataframe, .dataframe th, .dataframe td {
-  border: none;
-  border-bottom: 1px solid #C8C8C8;
-  border-collapse: collapse;
-  text-align:left;
+.dataframe th {
+  background: #284B63;
   padding: 10px;
-  margin-bottom: 40px;
-  font-size: 0.9em;
-  grid-row: 3;
+  font-family: arial;
+  font-size: 120%;
+  color: white;
+  border:2px solid #D9D9D9;
+  text-align:left !important;
 }
 
 tr:nth-child(odd)   {
-    background-color:#eee;
+    background-color:#D9D9D9;
 }
 tr:nth-child(even)	{
     background-color:#fff;
 }
 
 tr:hover {
-    background-color: #377ba8;
+  background: #3C6E71;
 }
 
+.select_form {
+  position: relative;
+  display: grid;
+  grid-template-columns: 33% 33% 33%;
+  width: 100%;
+}
+
+.select_form h1 {
+  grid-row: 1;
+  grid-column: 1/4;
+  font-size: 3vw;
+  font-weight: bolder;
+}
+
+.select_form legend {
+  border-bottom: 2px solid #284B63;
+}
+
+.select_target {
+  display: grid;
+  grid-row: 2;
+  grid-column: 1;
+  justify-content: center;
+}
+
+.select_text {
+  display: grid;
+  grid-row: 2;
+  grid-column: 2;
+  justify-content: center;
+  border-style: none solid;
+  border-color: #284B63;
+  border-width: 3px;
+}
+
+.select_charts {
+  display: grid;
+  grid-row: 2/3;
+  grid-column: 3;
+  justify-content: center;
+}
+
+.show_charts {
+  border: 2px double #D9D9D9;
+  border-radius: 10px;
+  display: inline-block;
+  text-align: center;
+  padding: 6px 12px;
+  margin: 1em auto;
+  cursor: pointer;
+  font-size: 2vw;
+  font-weight: bold;
+  color: #fff;
+  transition: all 0.5s;
+  background-color: #284B63;
+  grid-row: 3;
+  grid-column: 2/3;
+}
+
+.show_charts:hover {
+  background-color: #3C6E71;
+  transform: scale(1.1);
+}
 
 .chart_div {
-    display: grid;
-}
-
-.chart_div h1 {
-    grid-row: 1;
-}
-
-#chartDistribution {
-    grid-row: 2;
-}
-
-#chart_div h2 {
-    grid-row: 3;
-}
-
-#chartTextLength {
-    grid-row: 4;
-}
-
-#chartWordLengthchartWordLength {
-    grid-row: 5;
-}
-
-#chartBigrams {
-    grid-row: 6;
+    display: none;
+    flex-direction: column;
 }
 
 .model_div {
-    display: grid;
+    position: relative;
+    display: none;
     width: 100%;
+    height: 100%;
+    color: #284B63;
+}
+
+.model_div h1 {
+  grid-row: 1;
+  font-size: 2.5vw;
+  font-weight: bolder;
+  width: 100%;
+  text-align: center;
+  color: #284B63;
+  margin: 2em auto;
+}
+
+.model_div legend {
+  border-bottom: 2px solid #284B63;
+  margin-bottom: 1em;
+}
+
+legend {
+  font-size: 2vw;
+  margin-bottom: 5%;
+}
+
+label {
+  font-size: 1.5vw;
 }
 
 .model_form {
     display: grid;
-    grid-row: 1;
-}
-
-.label_select {
-    grid-row: 1;
-    grid-column: 1 / 5;
+    grid-row: 2;
+    grid-template-columns: 33% 33% 33%;
 }
 
 .labels_div {
@@ -188,16 +405,25 @@ tr:hover {
     justify-content: center;
 }
 
-.model_select {
-    grid-row: 1;
-    grid-column: 1 / 5;
+.label_select {
+  grid-row: 1;
+  grid-column: 1 / 5;
 }
 
 .models_div {
-    display: grid;
+  display: grid;
+  grid-row: 1;
+  grid-column: 2;
+  justify-content: center;
+  color: #284B63;
+  border-style: none solid;
+  border-color: #284B63;
+  border-width: 3px;
+}
+
+.model_select {
     grid-row: 1;
-    grid-column: 2;
-    justify-content: center;
+    grid-column: 1 / 5;
 }
 
 .label_SVM {
@@ -206,6 +432,14 @@ tr:hover {
 
 .label_Naive {
     grid-row: 3;
+}
+
+.label_LogisticRegression {
+  grid-row: 4;
+}
+
+.label_RandomForest {
+  grid-row: 5;
 }
 
 .options_div {
@@ -219,166 +453,102 @@ tr:hover {
   grid-row: 1;
   grid-column: 1 / 5;
 }
+
 .label_Tfidf {
   grid-row: 2;
 }
 
-.label_Count {
+.label_bi_gram {
   grid-row: 3;
 }
 
-.submit_selection {
-    border: 2px double #ccc;
+.label_GloVe {
+  grid-row: 4;
+}
+
+.show_models {
+    border: 2px double #D9D9D9;
     border-radius: 10px;
     display: inline-block;
     text-align: center;
     padding: 6px 12px;
+    margin: 1em auto;
     cursor: pointer;
     font-size: 2vw;
     font-weight: bold;
     color: #fff;
     transition: all 0.5s;
-    background-color: rgb(0, 90, 143);
+    background-color: #284B63;
     grid-row: 2;
-    grid-column: 1/4;
+    grid-column: 2/3;
+    width: 50%;
 }
 
-.submit_selection:hover {
-    background-color: rgb(26, 147, 218);
+.show_models:hover {
+    background-color: #3C6E71;
+    transform: scale(1.1);
 }
 
-/* Customize the label (the container) */
-.checkbox_label {
-    display: block;
-    position: relative;
-    padding-left: 35px;
-    margin-bottom: 12px;
-    cursor: pointer;
-    font-size: 22px;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-  
-  /* Hide the browser's default checkbox */
-  .checkbox_label input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-  }
-  
-  /* Create a custom checkbox */
-  .checkmark {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 25px;
-    width: 25px;
-    background-color: #eee;
-  }
-  
-  /* On mouse-over, add a grey background color */
-  .checkbox_label:hover input ~ .checkmark {
-    background-color: #ccc;
-  }
-  
-  /* When the checkbox is checked, add a blue background */
-  .checkbox_label input:checked ~ .checkmark {
-    background-color: rgb(26, 147, 218);
-  }
-  
-  /* Create the checkmark/indicator (hidden when not checked) */
-  .checkmark:after {
-    content: "";
-    position: absolute;
-    display: none;
-  }
-  
-  /* Show the checkmark when checked */
-  .checkbox_label input:checked ~ .checkmark:after {
-    display: block;
-  }
-  
-  /* Style the checkmark/indicator */
-  .checkbox_label .checkmark:after {
-    left: 9px;
-    top: 5px;
-    width: 5px;
-    height: 10px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
-    -webkit-transform: rotate(45deg);
-    -ms-transform: rotate(45deg);
-    transform: rotate(45deg);
-  }
 
 
-.center {
-    height: 10%;
-    display: none;
-    justify-content: center;
-    align-items: center;
-    background: transparent;
-    margin-top: 10%;
-    grid-row: 3/5;
-  }
-  .wave {
-    width: 5px;
-    height: 100px;
-    background: linear-gradient(45deg, rgb(0, 90, 143), #fff);
-    margin: 10px;
-    animation: wave 1s linear infinite;
-    border-radius: 20px;
-  }
-  .wave:nth-child(2) {
-    animation-delay: 0.1s;
-  }
-  .wave:nth-child(3) {
-    animation-delay: 0.2s;
-  }
-  .wave:nth-child(4) {
-    animation-delay: 0.3s;
-  }
-  .wave:nth-child(5) {
-    animation-delay: 0.4s;
-  }
-  .wave:nth-child(6) {
-    animation-delay: 0.5s;
-  }
-  .wave:nth-child(7) {
-    animation-delay: 0.6s;
-  }
-  .wave:nth-child(8) {
-    animation-delay: 0.7s;
-  }
-  .wave:nth-child(9) {
-    animation-delay: 0.8s;
-  }
-  .wave:nth-child(10) {
-    animation-delay: 0.9s;
-  }
-  
-  @keyframes wave {
-    0% {
-      transform: scale(0);
-    }
-    50% {
-      transform: scale(1);
-    }
-    100% {
-      transform: scale(0);
-    }
-  }
+
+
+
+
+
+/* view.html */
+
+.model_result_div {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
 
 .results {
-    grid-row: 6;
-    text-align: center;
-    display: none;
+  position: relative;
+  text-align: center;
+  width: 100%;
+  font-size: 3vw;
+  font-weight: bolder;
+  color: #284B63;
 }
 
-#model_output {
-    grid-row: 7;
+.trained_labels {
+  display: flex;
+  flex-direction: row;
+  font-size: 2.5vw;
+  font-weight: bolder;
+  color: #284B63;
+}
+
+.trained_labels p {
+  margin: 0 auto;
+  padding: 0;
+}
+
+.trained_labels_text{
+  display: flex;
+  flex-direction: column;
+  justify-content: left;
+  text-align: left;
+  font-weight: bolder;
+  color: #284B63;
+  padding-left: 0.5em;
+}
+
+.trained_labels_text p {
+  text-align: left;
+  padding-bottom: 0.5em;
+  width: 100%;
+}
+
+.model_output {
+  display: flex;
+  vertical-align: middle;
+  justify-content: center;
+  width: 100%;
+  overflow: hidden;
 }

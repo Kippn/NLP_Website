@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename= 'style.css')}}">
+  <title>Document</title>
+</head>
+<body>
+<div class="main_div_select">
+<div class="select_div">
+  <h1>Head of Data</h1>
+  {{ data|safe }}
+  <form class="select_form">
+    <h1>Select the necessary options</h1>
+    <div class="select_target">
+      <legend>Select Target Column</legend>
+    </div>
+    <div class="select_text">
+      <legend>Select Text Column</legend>
+    </div>
+    <div class="select_charts">
+      <legend>Select Charts</legend>
+          <label class="checkbox_label label_Distribution">
+            Distribution
+            <input type="checkbox" id="chart", value="Distribution">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_TextLength">
+            Text Length
+            <input type="checkbox" id="chart", value="Text Length">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_WordLength">
+            Word Length
+            <input type="checkbox" id="chart", value="Word Length">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_Bi-Grams">
+            Frequent Bi-Grams
+            <input type="checkbox" id="chart", value="Bi-Grams">
+            <span class="checkmark"></span>
+          </label>
+    </div>
+    <button class="show_charts">Show Charts</button>
+    <div class="center center_select">
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+    </div>
+  </form>
+</div>
+
+  <div class="chart_div">
+    <div id='chartDistribution'></div>
+    <div id='chartTextLength'></div>
+    <div id='chartWordLength'></div>
+    <div id='chartBigrams'></div>
+  </div>
+
+  <div class="model_div">
+    <h1>Select the preferred model options</h1>
+
+    <form method="POST" action="/view" class="model_form" enctype="multipart/form-data">
+
+        <div class="labels_div">
+          <legend class="label_select">Select labels to train</legend>
+        </div>
+
+        <div class="models_div">
+          <legend class="model_select">Select ML Models</legend>
+          <label class="checkbox_label label_SVM">
+            SVM
+            <input type="checkbox" name="model" id="model", value="SVM">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_Naive">
+            Naive Bayes
+            <input type="checkbox" name="model" id="model", value="Naive Bayes">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_LogisticRegression">
+            Logistic Regression
+            <input type="checkbox" name="model" id="model", value="Logistic Regression">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_RandomForest">
+            Random Forest
+            <input type="checkbox" name="model" id="model", value="Random Forest">
+            <span class="checkmark"></span>
+          </label>
+        </div>
+
+        <div class="options_div">
+          <legend class="option_select">Select Vectorizer</legend>
+          <label class="checkbox_label label_Tfidf">
+            Tfidf-Vectorizer
+            <input type="checkbox" name="options" id="option", value="TfidfVectorizer">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_bi_gram">
+            N-Gram
+            <input type="checkbox" name="options" id="option", value="N-Gram">
+            <span class="checkmark"></span>
+          </label>
+
+          <label class="checkbox_label label_GloVe">
+            GloVe
+            <input type="checkbox" name="options" id="option", value="GloVe">
+            <span class="checkmark"></span>
+          </label>
+        </div>
+        <label class="upload_button show_models">
+          <i class="fa fa-cloud-upload"></i>
+          <input type="submit" value="Show Models"/>
+          Calculate Models
+        </label>
+        <div class="center center_model">
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+        </div>
+    </form>
+  </div>
+</div>
+</body>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script>
+  createCheckBox({{features|safe}}, '.select_target', 'target', 'radio');
+  createCheckBox({{features|safe}}, '.select_text', 'text', 'radio');
+</script>
+</html>

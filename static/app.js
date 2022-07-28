@@ -1,39 +1,34 @@
 function getChartDistribution(input) {
   var graphs = input;
-  //graphs.config = {'displayModeBar': false};
   chart = document.querySelector('#chartDistribution');
   Plotly.newPlot(chart,graphs,{});
 }
 
 function getChartTextLength(input) {
   var graphs = input;
-  //graphs.config = {'displayModeBar': false};
   chart = document.querySelector('#chartTextLength');
   Plotly.newPlot(chart,graphs,{});
 }
 
 function getChartWordLength(input) {
   var graphs = input;
-  //graphs.config = {'displayModeBar': false};
   chart = document.querySelector('#chartWordLength');
   Plotly.newPlot(chart,graphs,{});
 }
 
 function getBigrams(input) {
   var graphs = input;
-  //graphs.config = {'displayModeBar': false};
   chart = document.querySelector('#chartBigrams');
   Plotly.newPlot(chart,graphs,{});
 }
 
 function modelTable(input) {
   var graphs = input;
-  //graphs.config = {'displayModeBar': false};
-  chart = document.querySelector('#model_output');
+  chart = document.querySelector('.model_output');
   Plotly.newPlot(chart,graphs,{});
 }
 
-function createCheckBox(labels) {
+function createCheckBox(labels, containerName, element, option) {
   let row = 2;
   labels.forEach((elem) => {
     row += 1;
@@ -43,10 +38,10 @@ function createCheckBox(labels) {
     label.setAttribute('class', 'checkbox_label')
     
     const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.name = 'label';
+    checkbox.type = option;
+    checkbox.name = element;
     checkbox.value = elem;
-    checkbox.id = 'label';
+    checkbox.id = element;
 
     const span = document.createElement('span');
     span.setAttribute('class', 'checkmark');
@@ -55,122 +50,129 @@ function createCheckBox(labels) {
     label.appendChild(checkbox);
     label.appendChild(span);
 
-    document.querySelector('.labels_div').appendChild(label);
+    document.querySelector(containerName).appendChild(label);
     $(label).css(
       "grid-row", row
     );
   });
 }
 
-
-function send() {
-  $('.center').css(
+$('.show_models').click(function() {
+  $('.center_model')
+  .css(
     "display", "flex"
   );
-  
   $("html, body").animate({ scrollTop: $(document).height()-$(window).height() });
- 
-  labels = document.querySelectorAll("#label");
-  l = [];
-  labels.forEach(e => {
-    if (e.checked) l.push(e.value);
-  });
-  m = [];
-  models = document.querySelectorAll("#model");
-  models.forEach(e => {
-    if (e.checked) m.push(e.value);
-  });
-  o = [];
-  options = document.querySelectorAll("#option");
-  options.forEach(e => {
-    if (e.checked) o.push(e.value);
-  });
-  json_labels = JSON.stringify(l);
-  json_models = JSON.stringify(m);
-  json_options = JSON.stringify(o);
-  json_data = {"labels":l, "models": m, "options": o};
+})
 
-  $('.model_form').on('submit', function(event) {
-    $.ajax({
-      type: 'POST',
-      dataType : 'json',
-      contentType: 'application/json',
-      url: '/generateModels',
-      data: JSON.stringify(json_data),
-      error: function(XMLHttpRequest, textStatus, errorThrown) {
-        $('.center').css(
-        "display", "none"
-        );
-        $('#model_output').html('Error: ' + errorThrown); 
-      }
-    })
-    .done(function(data) {
-      $('.center').css(
-        "display", "none"
-      );
-      $('.results').css(
-        "display", "block"
-      );
-      console.log(data);
-      //$('#model_output').html(data);
-      modelTable(data);
-    });
-    event.preventDefault();
-  });
-};
+$('.show_charts').click(function(event) {
+  $('.chart_div').css('display', 'none')
+  $('.model_div').css('display', 'none')
+  $('.center_select').css(
+    "display", "flex"
+  );
+  $("html, body").animate({ scrollTop: $(document).height()-$(window).height() });
+  box = document.querySelectorAll('#label')
+  box.forEach(b => {
+    console.log(b);
+    b.remove();
+  })
+  target = document.querySelectorAll('#target');
+  text = document.querySelectorAll('#text');
+  chart = document.querySelectorAll('#chart');
+  targetSelected = [];
+  textSelected = [];
+  chartSelected = [];
 
-$('.submit_selection').click(function() {
-  send();
+  target.forEach(t => {
+    if(t.checked) targetSelected.push(t.value);
+  });
+
+  text.forEach(t => {
+    if(t.checked) textSelected.push(t.value);
+  });
+
+  chart.forEach(t => {
+    if(t.checked) chartSelected.push(t.value);
+  });
+
+  json_data = {"target":targetSelected, "text": textSelected, "chart": chartSelected};
+
+  $.ajax({
+    type: 'POST',
+    dataType : 'json',
+    contentType: 'application/json',
+    url: '/showData',
+    data: JSON.stringify(json_data),
+    error: function(XMLHttpRequest, textStatus, errorThrown) {
+      console.log(errorThrown);
+    }
+  })
+  .done(function(data) {
+    $('.center_select').hide()
+    $('.chart_div').css('display', 'flex')
+    $('.model_div').css('display', 'grid')
+    if(data.hasOwnProperty('dist')){
+      getChartDistribution(JSON.parse(data['dist']));
+    }
+    if(data.hasOwnProperty('textLength')){
+      getChartTextLength(JSON.parse(data['textLength']));
+    }
+    if(data.hasOwnProperty('wordLength')){
+      getChartWordLength(JSON.parse(data['wordLength']));
+    }
+    if(data.hasOwnProperty('bigram')){
+      getBigrams(JSON.parse(data['bigram']));
+    }
+    if(data.hasOwnProperty('labels')){
+      createCheckBox(JSON.parse(data['labels']), '.labels_div', 'label','checkbox');
+    }
+  });
+  event.preventDefault();
 });
 
-let submitActive = false;
+function printLabels(labels) {
+  div =  document.querySelector('.trained_labels_text');
+  labels.forEach(l => {
+    p = document.createElement('p');
+    p.innerHTML = l;
+    div.appendChild(p);
+  })
+}
+
 $(document).ready(function() {
   $(".show_csv").addClass('block_click')
   $(".submit_csv").addClass('block_click')
 })
 
 function changeColorSubmit() {
-  submitActive = true;
   $(".submit_csv").css (
-    "background-color", "rgb(0,143,64)"
+    "background-color", "#284B63"
   );
   $(".submit_csv").removeClass('block_click')
 }
 
 $(".submit_csv").on({
   mouseenter: function() {
-    if (submitActive) {
-      $(".submit_csv").css('background-color', 'rgb(70, 206, 131)');
-    } else {
-      $(".submit_csv").css('background-color', 'rgb(26, 147, 218)');
-    }
+    $(".submit_csv").css('background-color', '#3C6E71');
   },
   mouseleave: function() {
-    if (submitActive) {
-      $(".submit_csv").css('background-color', 'rgb(0,143,64)');
-    } else {
-      $(".submit_csv").css('background-color', ' rgb(0, 90, 143)');
-    }
+    $(".submit_csv").css('background-color', "#284B63");
   }
 })
 
 function changeColorShowCSV() {
-  submitActive = false;
-  $(".submit_csv").css (
-    "background-color", "rgb(0,90,143)"
-  );
   $(".show_csv").css (
-    "background-color", "rgb(0,143,64)"
+    "background-color", "#284B63"
   );
   $(".show_csv").removeClass('block_click')
 }
 
 $(".show_csv").on({
   mouseenter: function() {
-    $(".show_csv").css('background-color', 'rgb(70, 206, 131)');
+    $(".show_csv").css('background-color', '#3C6E71');
   },
   mouseleave: function() {
-    $(".show_csv").css('background-color', 'rgb(0,143,64)');
+    $(".show_csv").css('background-color', "#284B63");
   }
 })
-

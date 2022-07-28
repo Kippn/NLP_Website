@@ -8,12 +8,13 @@
   <title>Document</title>
 </head>
 <body>
+
   <div class="main_div">
-    <h1 class="headline">NLP MACHINE LEARNING</h1>
+    <h1 class="headline">Natural Language Processing <br> Machine Learning</h1>
     <h2 class="second_headline">Upload .csv file</h2>
     <form class="csv_upload_form" action="" method="POST" enctype="multipart/form-data">
       <label class="upload_button load_csv">
-        <input type="file" id="uploaded_file" name="file" accept=".csv" onchange="changeColorSubmit()">
+        <input type="file" id="uploaded_file" name="file" accept=".csv, .tsv" onchange="changeColorSubmit()">
         <i class="fa fa-cloud-upload"></i>
         Upload File
       </label>
@@ -23,13 +24,15 @@
         Submit
       </label>
     </form>
-    <form class="show_csv_form" action="/show_data">
+
+    <form class="show_csv_form" action="/select" method="POST">
       <label class="upload_button show_csv">
         <i class="fa fa-cloud-upload"></i>
         <input type="submit" value="Show CSV"/>
         Show CSV
       </label>
     </form>
+    
   </div>
 </body>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
