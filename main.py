@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.figure_factory import create_distplot
+import mkl
 
 import nltk
 from nltk import pos_tag
@@ -36,11 +37,11 @@ from collections import defaultdict
 
 import warnings
 
-nltk.download('stopwords')
-nltk.download('punkt')
-nltk.download('wordnet')
-nltk.download('omw-1.4')
-nltk.download('averaged_perceptron_tagger')
+#nltk.download('stopwords')
+#nltk.download('punkt')
+#nltk.download('wordnet')
+#nltk.download('omw-1.4')
+#nltk.download('averaged_perceptron_tagger')
 stop = set(stopwords.words('english'))
 nlp = spacy.load("en_core_web_lg")
 
@@ -57,6 +58,7 @@ app.secret_key = 'This is your secret key to utilize session in Flask'
 # flask index route
 @app.route('/')
 def index():
+    session.clear()
     return render_template('index.html')
 
 
@@ -108,22 +110,43 @@ def showData():
         check_box_chart = data['chart']
         session['target'] = check_box_target
         session['text'] = check_box_text
+        print(check_box_text, flush=True)
         charts = showCharts(uploaded_df, check_box_text, check_box_target)
         df = processText(uploaded_df, check_box_text).text_cleaning()
         df.to_csv(data_file_path)
-        # df.iloc[:1000].to_csv(data_file_path)
+        #df.iloc[:500].to_csv(data_file_path)
         out = {}
+
         if 'Bi-Grams' in check_box_chart:
-            bigram = showBigrams(df, check_box_text, check_box_target).plot_bigrams()
+            if 'bigram' in session:
+                bigram = session['bigram']
+            else:
+                bigram = showBigrams(df, check_box_text, check_box_target).plot_bigrams()
+                session['bigram'] = bigram
             out.update({'bigram': bigram})
+
         if 'Distribution' in check_box_chart:
-            dist = charts.plotDistribution()
+            if 'dist' in session:
+                dist = session['dist']
+            else:
+                dist = charts.plotDistribution()
+                session['dist'] = dist
             out.update({'dist': dist})
+
         if 'Text Length' in check_box_chart:
-            textLength = charts.plotTextLength()
+            if 'textLength' in session:
+                textLength = session['textLength']
+            else:
+                textLength = charts.plotTextLength()
+                session['textLength'] = textLength
             out.update({'textLength': textLength})
+
         if 'Word Length' in check_box_chart:
-            wordLength = charts.plotWordLength()
+            if 'wordLength' in session:
+                wordLength = session['wordLength']
+            else:
+                wordLength = charts.plotWordLength()
+                session['wordLength'] = wordLength
             out.update({'wordLength': wordLength})
 
         labels = charts.getLabels()
@@ -141,16 +164,19 @@ def view():
     check_box_labels = request.form.getlist('label')
     check_box_models = request.form.getlist('model')
     check_box_options = request.form.getlist('options')
+    print(session['text'], flush=True)
     models = trainModels(uploaded_df, session['text'], session['target'], check_box_labels, check_box_models,
                          check_box_options)
     model_pred, labels = models.plotOutput()
-    return render_template('view.html', model=model_pred, labels=labels)
+
+    return render_template('view.html', model=model_pred.to_html(), labels=labels)
 
 
 # calculate charts
 class showCharts:
     def __init__(self, df, text=0, target=0):
         self.df = df
+        self.color = ['#284B63', '#4D194D', '#d62828', '#7a0045']
         if target != 0:
             self.target = target
             self.labels = df[target].unique()
@@ -159,12 +185,14 @@ class showCharts:
 
     def plotDistribution(self):
         lengths = []
+
         for label in self.labels:
             lengths.append(self.df[self.df[self.target] == label].shape[0])
 
         d = {'labels': self.labels, 'samples': lengths}
         t = pd.DataFrame(d)
-        fig = px.bar(t, x='labels', y='samples', color='labels', title='Data distribution')
+        fig = px.bar(t, x='labels', y='samples', color='labels', title='Data distribution',
+                     color_discrete_sequence=self.color)
         fig.update_layout(legend=dict(orientation="h",
                                       yanchor="bottom",
                                       y=1.02,
@@ -179,7 +207,6 @@ class showCharts:
         return distJSON
 
     def plotTextLength(self):
-        colors = ["red", "green", "blue", "magenta"]
 
         fig = make_subplots(
             rows=1, cols=2,
@@ -193,7 +220,7 @@ class showCharts:
             fig.add_trace(go.Histogram(
                 x=self.df[self.df[self.target] == label][self.text].str.len(),
                 name=label,
-                marker=dict(color=colors[np.where(self.labels == label)[0][0]]),
+                marker=dict(color=self.color[np.where(self.labels == label)[0][0]]),
                 legendgroup="group"
             ),
                 row=1, col=1
@@ -202,7 +229,7 @@ class showCharts:
             fig.add_trace(go.Histogram(
                 x=self.df[self.df[self.target] == label][self.text].str.split().map(lambda x: len(x)),
                 name=label,
-                marker=dict(color=colors[np.where(self.labels == label)[0][0]]),
+                marker=dict(color=self.color[np.where(self.labels == label)[0][0]]),
                 legendgroup="group",
                 showlegend=False),
                 row=1, col=2
@@ -219,7 +246,7 @@ class showCharts:
                           plot_bgcolor='#D9D9D9',
                           font=dict(color='#284B63', family="Lucida Console", size=20))
 
-        fig.update_traces(opacity=0.75)
+        fig.update_traces(opacity=0.65)
 
         fig.update_xaxes(range=[0, 200], row=1, col=1)
         fig.update_xaxes(range=[0, 50], row=1, col=2)
@@ -239,8 +266,9 @@ class showCharts:
             word = self.df[self.df[self.target] == label][self.text].str.split().apply(lambda x: [len(i) for i in x])
             hist_data.append(word.map(lambda x: np.mean(x)))
 
-        fig = create_distplot(hist_data, self.labels, bin_size=0.2)
-        fig.update_xaxes(range=[0, 10])
+        fig = create_distplot(hist_data, self.labels, bin_size=0.2, colors=self.color)
+        fig.update_xaxes(title_text='length', range=[0, 10])
+        # fig.update_yaxes(title_text='probability density')
         fig.update_layout(title_text='Word length', legend=dict(orientation="h",
                                                                 yanchor="bottom",
                                                                 y=1.02,
@@ -338,50 +366,34 @@ class showBigrams:
         return words_freq[:n]
 
     def plot_bigrams(self):
+        color = ['#001219', '#005F73', '#0A9396', '#94D2BD', '#E9D8A6', '#EE9B00', '#CA6702', '#BB3E03', '#AE2012',
+                 '#9B2226', '#006466', '#144552', '#212F45', '#312244', '#4D194D']
         bigrams = self.get_top_bi_grams(self.df[self.text], 15)
         y, x = map(list, zip(*bigrams))
-        d = pd.DataFrame({'bi-gram': y, 'frequency': x})
-        fig = px.bar(d, x='frequency', y='bi-gram', color='bi-gram', orientation='h')
+        df = pd.DataFrame({'bi-gram': y, 'frequency': x, 'label': 'complete'})
+
+        for label in self.labels:
+            bigrams = self.get_top_bi_grams(self.df[self.df[self.target] == label][self.text], 15)
+            y, x = map(list, zip(*bigrams))
+            d = pd.DataFrame({'bi-gram': y, 'frequency': x, 'label': label})
+            df = pd.concat([df, d], ignore_index=True)
+
+        df.sort_values(by='frequency', inplace=True)
+        fig = px.bar(df, x='frequency', y='bi-gram', color='label', orientation='h', facet_row='label',
+                     color_discrete_sequence=color, text='frequency')
         fig.update_layout(title_text='top bi-grams',
                           showlegend=False,
                           paper_bgcolor='#FFFFFF',
                           plot_bgcolor='#D9D9D9',
-                          font=dict(color='#284B63', family="Lucida Console", size=15))
+                          height=400 * len(df['label'].unique()),
+                          font=dict(color='#284B63',
+                                    family="Lucida Console", size=15))
+        fig.update_yaxes(matches=None)
+        fig.update_xaxes(matches=None)
 
         bigramsJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
         return bigramsJSON
-
-
-# generat colors for prediction table
-def generateColors(df):
-    maxValueIndex = df.idxmax(axis=1)
-    out = []
-    for col in df.columns:
-        temp = []
-        for row in range(len(df[col])):
-            if maxValueIndex[row] == col:
-                temp.append('#3C6E71')
-            else:
-                temp.append('#284B63')
-        out.append(temp)
-    out.insert(0, '#353535')
-    return out
-
-
-# calculate prediction table size depending on selected options
-def calcTableSize(columns, rows, base=200, height_per_row=50, height_head_line=40, width_per_column=330):
-    min_width = 1000
-    min_height = 500
-    total_height = 0 + base
-    total_width = columns * width_per_column
-    total_height += rows * height_per_row + height_head_line
-    if min_height > total_height:
-        total_height = min_height
-    if min_width > total_width:
-        total_width = min_width
-
-    return total_height, total_width
 
 
 # model training
@@ -499,6 +511,9 @@ class trainModels:
             X = DataForML[Predictors].values
             y = DataForML[TargetVariable].values
 
+        if 'BERT' in self.options:
+            return
+
         for vec in vectorizer:
             vectorizer[vec].fit(self.df['text_final'])
         return vectorizer, X, y
@@ -511,17 +526,15 @@ class trainModels:
             X_test = vectorizer[vec].transform(self.X_test)
             model.fit(X_train, self.y_train)
             pred = model.predict(X_test)
-            output.update({f'Accuracy Score {vec}': (accuracy_score(self.y_test, pred))})
+            output.update({(vec, 'Accuracy'): accuracy_score(self.y_test, pred)})
             if len(self.labels) == 2:
-                output.update({
-                    f'Precision Score {vec}': (precision_score(self.y_test, pred, average="binary"))})
-                output.update(
-                    {f'F1 Score {vec}': (f1_score(self.y_test, pred, average="binary"))})
+                output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average="binary")})
+                output.update({(vec, 'Recall'): recall_score(self.y_test, pred, average="binary")})
+                output.update({(vec, 'F1'): f1_score(self.y_test, pred, average="binary")})
             else:
-                output.update({
-                    f'Precision Score {vec}': (precision_score(self.y_test, pred, average="weighted"))})
-                output.update(
-                    {f'F1 Score {vec}': (f1_score(self.y_test, pred, average="weighted"))})
+                output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average="macro")})
+                output.update({(vec, 'Recall'): recall_score(self.y_test, pred, average="macro")})
+                output.update({(vec, 'F1'): f1_score(self.y_test, pred, average="macro")})
 
         if len(X_glove) != 0:
             PredictorScaler = MinMaxScaler()
@@ -541,17 +554,15 @@ class trainModels:
             model.fit(X_train, y_train)
             pred = model.predict(X_test)
 
-            output.update({'Accuracy Score GloVe': (accuracy_score(y_test, pred))})
+            output.update({('GloVe', 'Accuracy'): accuracy_score(y_test, pred)})
             if len(self.labels) == 2:
-                output.update({
-                    'Precision Score GloVe': (precision_score(y_test, pred, average="binary"))})
-                output.update(
-                    {'F1 Score GloVe': (f1_score(y_test, pred, average="binary"))})
+                output.update({('GloVe', 'Precision'): precision_score(y_test, pred, average="binary")})
+                output.update({('GloVe', 'Recall'): recall_score(y_test, pred, average="binary")})
+                output.update({('GloVe', 'F1'): f1_score(y_test, pred, average="binary")})
             else:
-                output.update({
-                    'Precision Score GloVe': (precision_score(y_test, pred, average="weighted"))})
-                output.update(
-                    {'F1 Score GloVe': (f1_score(y_test, pred, average="weighted"))})
+                output.update({('GloVe', 'Precision'): precision_score(y_test, pred, average="macro")})
+                output.update({('GloVe', 'Recall'): recall_score(y_test, pred, average="macro")})
+                output.update({('GloVe', 'F1'): f1_score(y_test, pred, average="macro")})
 
         return output
 
@@ -579,47 +590,24 @@ class trainModels:
     # return a table with the calculated metrics
     def plotOutput(self):
         out = self.train()
-        df = pd.DataFrame(out)
-        df.index.name = "Metrics"
+        df = pd.DataFrame(out).T
         df.sort_index(inplace=True)
-        colors = generateColors(df)
-        df.reset_index(inplace=True)
-        df.rename(columns={'index': 'Metrics'}, inplace=True)
 
-        height, width = calcTableSize(df.shape[1], df.shape[0])
+        df = df.style.set_table_styles([
+            {'selector': 'tr:hover', 'props': [('background-color', '#adb5bd'), ('background', '#adb5bd')]},
+            {'selector': 'td:hover', 'props': [('background-color', '#284B63'), ('color', 'white')]},
+            {'selector': 'th:not(.index_name)', 'props': 'background-color: #353535; color: white;'},
+            {'selector': 'tr', 'props': 'line-height: 4vw'},
+            {'selector': 'th.col_heading', 'props': 'text-align: center;'},
+            {'selector': 'th.col_heading.level0', 'props': 'font-size: 1.5em;'},
+            {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535;'},
+            {'selector': 'td,th', 'props': 'line-height: inherit; padding: 0 10px'}],
+            overwrite=False)\
+            .format('{:.2%}')\
+            .apply(lambda x: ["background-color:#3C6E71;" if i == x.max() else "background-color: #D9D9D9;" for i in x],
+                   axis=0)
 
-        fig = go.Figure(data=[go.Table(
-            columnwidth=[1.5, 1],
-            header=dict(
-                values=list(df.columns),
-                line_color='white',
-                fill_color='#353535',
-                font=dict(size=25),
-                align='center',
-                height=40
-            ),
-            cells=dict(
-                values=[df[col] for col in df.columns],
-                line_color='white',
-                fill=dict(color=colors),
-                font=dict(size=20),
-                align='center',
-                height=30,
-                format=["", ".2%"]
-            )
-        ),
-        ])
-        fig.update_layout(
-            autosize=False,
-            height=height,
-            width=width,
-            paper_bgcolor='#FFFFFF',
-            plot_bgcolor='#D9D9D9',
-            font=dict(color='white', family="Lucida Console")
-        )
-        modelsJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-
-        return modelsJSON, self.labels
+        return df, self.labels
 
 
 if __name__ == "__main__":
