@@ -167,3 +167,5 @@ win-inet-pton==1.1.0
 wincertstore==0.2
 wrapt==1.14.1
 zipp==3.8.0
+
+mkl~=2021.4.0

@@ -1,6 +1,7 @@
 # imports
 
-from flask import Flask, jsonify, render_template, request, session
+from flask import Flask, jsonify, render_template, request, session, send_file
+from flask_session import Session
 import pandas as pd
 import numpy as np
 import os
@@ -8,6 +9,8 @@ import spacy
 import string
 import re
 import json
+import pickle
+import shutil
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
@@ -15,7 +18,6 @@ from plotly.subplots import make_subplots
 from plotly.figure_factory import create_distplot
 import mkl
 
-import nltk
 from nltk import pos_tag
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords, wordnet
@@ -29,19 +31,21 @@ from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_sc
 from sklearn import svm, naive_bayes
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.pipeline import Pipeline
 
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 from collections import defaultdict
 
+from imblearn.combine import SMOTETomek
+
 import warnings
 
-#nltk.download('stopwords')
-#nltk.download('punkt')
-#nltk.download('wordnet')
-#nltk.download('omw-1.4')
-#nltk.download('averaged_perceptron_tagger')
+# nltk.download('stopwords')
+# nltk.download('punkt')
+# nltk.download('wordnet')
+# nltk.download('omw-1.4')
+# nltk.download('averaged_perceptron_tagger')
 stop = set(stopwords.words('english'))
 nlp = spacy.load("en_core_web_lg")
 
@@ -50,9 +54,15 @@ warnings.simplefilter('ignore')
 app = Flask(__name__, template_folder='templates', static_folder='static')
 ALLOWED_EXTENSIONS = {'csv'}
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
+MODEL_FOLDER = os.path.join('static', 'models')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MODEL_FOLDER'] = MODEL_FOLDER
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
 
-app.secret_key = 'This is your secret key to utilize session in Flask'
+Encoder = LabelEncoder()
+PredictorScaler = MinMaxScaler()
 
 
 # flask index route
@@ -69,14 +79,15 @@ def upload_file():
         # upload file
         uploaded_file = request.files['file']
         data_filename = secure_filename(uploaded_file.filename)
-        if data_filename.__contains__('.csv'):
+        if '.csv' in data_filename:
             uploaded_file = pd.read_csv(uploaded_file, index_col=0)
-        if data_filename.__contains__('.tsv'):
+        if '.tsv' in data_filename:
             uploaded_file = pd.read_csv(uploaded_file, delimiter='\t')
         uploaded_file.dropna(inplace=True)
         uploaded_file.reset_index(drop=True, inplace=True)
         uploaded_file.to_csv(os.path.join(app.config['UPLOAD_FOLDER'], data_filename))
         session['uploaded_data_file_path'] = os.path.join(app.config['UPLOAD_FOLDER'], data_filename)
+        session.modified = True
 
     return '', 204
 
@@ -110,11 +121,11 @@ def showData():
         check_box_chart = data['chart']
         session['target'] = check_box_target
         session['text'] = check_box_text
-        print(check_box_text, flush=True)
+        session.modified = True
         charts = showCharts(uploaded_df, check_box_text, check_box_target)
-        df = processText(uploaded_df, check_box_text).text_cleaning()
+        df = processText(check_box_text, uploaded_df).text_cleaning_df()
         df.to_csv(data_file_path)
-        #df.iloc[:500].to_csv(data_file_path)
+        #df.iloc[:1000].to_csv(data_file_path)
         out = {}
 
         if 'Bi-Grams' in check_box_chart:
@@ -163,13 +174,40 @@ def view():
     uploaded_df = pd.read_csv(data_file_path, index_col=0)
     check_box_labels = request.form.getlist('label')
     check_box_models = request.form.getlist('model')
-    check_box_options = request.form.getlist('options')
-    print(session['text'], flush=True)
-    models = trainModels(uploaded_df, session['text'], session['target'], check_box_labels, check_box_models,
-                         check_box_options)
-    model_pred, labels = models.plotOutput()
+    check_box_options = request.form.getlist('option')
+    text = session.get('text', None)
+    target = session.get('target', None)
 
-    return render_template('view.html', model=model_pred.to_html(), labels=labels)
+    models = trainModels(uploaded_df, text, target, check_box_labels, check_box_models,
+                         check_box_options)
+    model_pred = models.plotOutput()
+
+    return render_template('view.html', model=model_pred.to_html(), labels=check_box_labels)
+
+
+@app.route('/download')
+def download_file():
+    path = shutil.make_archive('models', 'zip', os.path.join(app.config['MODEL_FOLDER']))
+    return send_file(path, as_attachment=True)
+
+
+@app.route('/test_input', methods=['POST'])
+def predict_text():
+    data = request.json['text']
+    data = processText(data).text_cleaning_sentence()
+    models_file = session.get('trained_models', None)
+
+    out = {}
+    for file_name in models_file:
+        if 'GloVe' not in file_name:
+            model = pickle.load(open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'rb'))
+            prediction = ' '.join(Encoder.inverse_transform(model.predict(data)))
+            file_name = file_name.replace('.pkl', '')
+            out.update({file_name: prediction})
+    df = pd.DataFrame(list(out.items()))
+    df.columns = ['Model', 'Prediction']
+
+    return df.to_json(orient='records')
 
 
 # calculate charts
@@ -185,14 +223,17 @@ class showCharts:
 
     def plotDistribution(self):
         lengths = []
+        percentage = []
 
         for label in self.labels:
-            lengths.append(self.df[self.df[self.target] == label].shape[0])
+            length = self.df[self.df[self.target] == label].shape[0]
+            lengths.append(length)
+            percentage.append(f'{round((length / self.df.shape[0])*100,2)}%')
 
-        d = {'labels': self.labels, 'samples': lengths}
+        d = {'labels': self.labels, 'samples': lengths, 'percentage': percentage}
         t = pd.DataFrame(d)
         fig = px.bar(t, x='labels', y='samples', color='labels', title='Data distribution',
-                     color_discrete_sequence=self.color)
+                     color_discrete_sequence=self.color, hover_data=['labels', 'percentage'])
         fig.update_layout(legend=dict(orientation="h",
                                       yanchor="bottom",
                                       y=1.02,
@@ -292,8 +333,9 @@ class showCharts:
 
 # text cleaning
 class processText:
-    def __init__(self, df, text):
-        self.df = df.copy()
+    def __init__(self, text, df=None):
+        if df is not None:
+            self.df = df.copy()
         self.text = text
 
     @staticmethod
@@ -332,10 +374,10 @@ class processText:
         tokens_without_sw = [word for word in text_tokens if word not in stop]
         return " ".join(tokens_without_sw)
 
-    def text_cleaning(self):
-        self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_URL(x))
+    def text_cleaning_df(self):
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_html(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_emoji(x))
+        self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_URL(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_rt(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_punct(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.stopword(x))
@@ -344,8 +386,21 @@ class processText:
         self.df.dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
         self.df = self.df.astype(str)
-
         return self.df
+
+    def text_cleaning_sentence(self):
+        self.text = self.remove_html(self.text)
+        self.text = self.remove_emoji(self.text)
+        self.text = self.remove_URL(self.text)
+        self.text = self.remove_rt(self.text)
+        self.text = self.remove_punct(self.text)
+        self.text = self.stopword(self.text)
+        self.text = self.text.lower()
+        self.text = word_tokenize(self.text)
+        wln = WordNetLemmatizer()
+        self.text = [' '.join([wln.lemmatize(words) for words in self.text])]
+
+        return self.text
 
 
 # top bi-grams bar chart
@@ -398,7 +453,7 @@ class showBigrams:
 
 # model training
 class trainModels:
-    def __init__(self, df, text, target, labels, models, options=['TfidfVectorizer']):
+    def __init__(self, df, text, target, labels, models, options=['Tfidf-Vectorizer']):
         self.y_test = None
         self.y_train = None
         self.X_test = None
@@ -438,14 +493,12 @@ class trainModels:
                                                                                 self.df[self.target],
                                                                                 test_size=0.2,
                                                                                 random_state=42)
-
-        Encoder = LabelEncoder()
         self.y_train = Encoder.fit_transform(self.y_train)
         self.y_test = Encoder.fit_transform(self.y_test)
         vectorizer = {}
 
-        if 'TfidfVectorizer' in self.options:
-            t = {'TfidfVectorizer': TfidfVectorizer(max_features=5000)}
+        if 'Tfidf-Vectorizer' in self.options:
+            t = {'Tfidf-Vectorizer': TfidfVectorizer(max_features=5000)}
             vectorizer.update(t)
 
         if 'N-Gram' in self.options:
@@ -519,13 +572,28 @@ class trainModels:
         return vectorizer, X, y
 
     # train Models
-    def trainPredictionModel(self, model, vectorizer, X_glove, y_glove):
+    def trainPredictionModel(self, model, model_name, vectorizer, X_glove, y_glove):
         output = {}
+        models = []
         for vec in vectorizer.keys():
             X_train = vectorizer[vec].transform(self.X_train)
             X_test = vectorizer[vec].transform(self.X_test)
-            model.fit(X_train, self.y_train)
-            pred = model.predict(X_test)
+            pipe = Pipeline([
+                (vec, vectorizer[vec]),
+                (model_name, model)
+            ])
+            pipe.fit(self.X_train, self.y_train)
+
+            # model.fit(X_train, self.y_train)
+            file_name = model_name + ' ' + vec + '.pkl'
+            with open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'wb') as f:
+                pickle.dump(pipe, f)
+                models.append(file_name)
+
+            # model = pickle.load(open(file_name,'rb'))
+
+            # pred = model.predict(X_test)
+            pred = pipe.predict(self.X_test)
             output.update({(vec, 'Accuracy'): accuracy_score(self.y_test, pred)})
             if len(self.labels) == 2:
                 output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average="binary")})
@@ -537,7 +605,6 @@ class trainModels:
                 output.update({(vec, 'F1'): f1_score(self.y_test, pred, average="macro")})
 
         if len(X_glove) != 0:
-            PredictorScaler = MinMaxScaler()
 
             # Storing the fit object for later reference
             PredictorScalerFit = PredictorScaler.fit(X_glove)
@@ -547,13 +614,22 @@ class trainModels:
 
             X_train, X_test, y_train, y_test = train_test_split(X, y_glove, test_size=0.2, random_state=42)
 
-            Encoder = LabelEncoder()
+            # Encoder = LabelEncoder()
             y_train = Encoder.fit_transform(y_train)
             y_test = Encoder.fit_transform(y_test)
 
-            model.fit(X_train, y_train)
-            pred = model.predict(X_test)
+            pipe = Pipeline([
+                (model_name, model)
+            ])
 
+            pipe.fit(X_train, y_train)
+
+            file_name = model_name + ' ' + 'GloVe' + '.pkl'
+            with open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'wb') as f:
+                pickle.dump(pipe, f)
+                models.append(file_name)
+
+            pred = pipe.predict(X_test)
             output.update({('GloVe', 'Accuracy'): accuracy_score(y_test, pred)})
             if len(self.labels) == 2:
                 output.update({('GloVe', 'Precision'): precision_score(y_test, pred, average="binary")})
@@ -564,26 +640,39 @@ class trainModels:
                 output.update({('GloVe', 'Recall'): recall_score(y_test, pred, average="macro")})
                 output.update({('GloVe', 'F1'): f1_score(y_test, pred, average="macro")})
 
-        return output
+        return output, models
 
     # use different models
     def train(self):
         vectorized, X_glove, y_glove = self.prepareData()
         output = {}
+        models = []
         if 'SVM' in self.models:
-            output['SVM'] = self.trainPredictionModel(svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto'),
-                                                      vectorized, X_glove, y_glove)
+            output['SVM'], model_name = self.trainPredictionModel(
+                svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto'), 'SVM',
+                vectorized, X_glove, y_glove)
+            models.extend(model_name)
 
         if 'Naive Bayes' in self.models:
-            output['Naive Bayes'] = self.trainPredictionModel(naive_bayes.MultinomialNB(), vectorized, X_glove, y_glove)
+            output['Naive Bayes'], model_name = self.trainPredictionModel(naive_bayes.MultinomialNB(), 'Naive Bayes',
+                                                                          vectorized,
+                                                                          X_glove, y_glove)
+            models.extend(model_name)
 
         if 'Logistic Regression' in self.models:
-            output['Logistic Regression'] = self.trainPredictionModel(LogisticRegression(), vectorized, X_glove,
-                                                                      y_glove)
+            output['Logistic Regression'], model_name = self.trainPredictionModel(LogisticRegression(),
+                                                                                  'Logistic Regression',
+                                                                                  vectorized, X_glove,
+                                                                                  y_glove)
+            models.extend(model_name)
 
         if 'Random Forest' in self.models:
-            output['Random Forest'] = self.trainPredictionModel(
-                RandomForestClassifier(n_estimators=100, random_state=100), vectorized, X_glove, y_glove)
+            output['Random Forest'], model_name = self.trainPredictionModel(
+                RandomForestClassifier(n_estimators=100, random_state=100), 'Random Forest', vectorized, X_glove,
+                y_glove)
+            models.extend(model_name)
+
+        session['trained_models'] = models
 
         return output
 
@@ -596,19 +685,20 @@ class trainModels:
         df = df.style.set_table_styles([
             {'selector': 'tr:hover', 'props': [('background-color', '#adb5bd'), ('background', '#adb5bd')]},
             {'selector': 'td:hover', 'props': [('background-color', '#284B63'), ('color', 'white')]},
-            {'selector': 'th:not(.index_name)', 'props': 'background-color: #353535; color: white;'},
+            {'selector': 'th:not(.index_name)', 'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.5vw'},
             {'selector': 'tr', 'props': 'line-height: 4vw'},
-            {'selector': 'th.col_heading', 'props': 'text-align: center;'},
-            {'selector': 'th.col_heading.level0', 'props': 'font-size: 1.5em;'},
-            {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535;'},
+            {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 2vw'},
+            {'selector': 'th.col_heading.level0', 'props': 'font-size: 1.5vw;'},
+            {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535; font-size: 1vw'},
             {'selector': 'td,th', 'props': 'line-height: inherit; padding: 0 10px'}],
-            overwrite=False)\
-            .format('{:.2%}')\
+            overwrite=False) \
+            .format('{:.2%}') \
             .apply(lambda x: ["background-color:#3C6E71;" if i == x.max() else "background-color: #D9D9D9;" for i in x],
                    axis=0)
 
-        return df, self.labels
+        return df
 
 
 if __name__ == "__main__":
+    app.secret_key = "123"
     app.run(debug=True)

@@ -136,6 +136,25 @@ body, html{
   }
 }
 
+.btn {
+  border: 2px double #D9D9D9;
+  border-radius: 10px;
+  display: inline-block;
+  text-align: center;
+  padding: 6px 12px;
+  margin: 1em auto;
+  cursor: pointer;
+  font-size: 2vw;
+  font-weight: bold;
+  color: #fff;
+  transition: all 0.5s;
+  background-color: #284B63;
+}
+
+.btn:hover {
+  background-color: #3C6E71;
+  transform: scale(1.1);
+}
 
 
 
@@ -151,7 +170,8 @@ body, html{
     height: 100%;
     margin: 0 auto;
     padding: 0;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     text-align: center;
     justify-content: center;
     align-items: center;
@@ -162,14 +182,12 @@ body, html{
     margin: 1em auto;
     padding: 0;
     font-size: 5vw;
-    grid-row: 1;
 }
 
 .second_headline {
     margin: 0 auto;
     padding: 0;
     font-size: 3vw;
-    grid-row: 2;
 }
 
 .upload_button {
@@ -184,17 +202,25 @@ body, html{
   font-weight: bold;
   color: #fff;
   transition: all 0.5s;
+  margin: auto;
 }
 
 .csv_upload_form {
     margin: 0 auto;
     padding: 0;
-    grid-row: 3;
-    width: 100%;
+    width: 15%;
     text-align: center;
     justify-content: center;
     align-items: center;
-    display: grid;
+}
+
+.show_csv_form {
+  margin: 0 auto;
+  padding: 0;
+  width: 15%;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
 }
 
 input[type="file"] {
@@ -207,7 +233,6 @@ input[type="submit"] {
 
 .load_csv {
     background-color: #284B63;
-    grid-row: 1;
     margin: 0 auto;
     margin-top: 1em;
 }
@@ -219,7 +244,6 @@ input[type="submit"] {
 
 .submit_csv {
     background-color: #353535;
-    grid-row: 2;
     margin: 1em auto;
 }
 
@@ -229,8 +253,7 @@ input[type="submit"] {
 
 .show_csv {
   background-color: #353535;
-  margin: 0 auto;
-  grid-row: 1;
+  margin: auto;
 }
 
 .show_csv:hover {
@@ -242,16 +265,7 @@ input[type="submit"] {
     pointer-events: none;
 }
 
-.show_csv_form {
-  margin: 0 auto;
-  padding: 0;
-  grid-row: 4;
-  width: 100%;
-  text-align: center;
-  justify-content: center;
-  align-items: center;
-  display: grid;
-}
+
 
 
 
@@ -286,7 +300,7 @@ input[type="submit"] {
   font-size: 120%;
   color: white;
   border:2px solid #D9D9D9;
-  text-align:left !important;
+  text-align: left;
 }
 
 .select_div tr:nth-child(odd)   {
@@ -362,25 +376,8 @@ legend {
 }
 
 .show_charts {
-  border: 2px double #D9D9D9;
-  border-radius: 10px;
-  display: inline-block;
-  text-align: center;
-  padding: 6px 12px;
-  margin: 1em auto;
-  cursor: pointer;
-  font-size: 2vw;
-  font-weight: bold;
-  color: #fff;
-  transition: all 0.5s;
-  background-color: #284B63;
   grid-row: 5;
   grid-column: 2;
-}
-
-.show_charts:hover {
-  background-color: #3C6E71;
-  transform: scale(1.1);
 }
 
 .chart_div {
@@ -521,9 +518,9 @@ label {
   display: flex;
   flex-direction: column;
   width: 100%;
-  text-align: center;
   justify-content: center;
   align-items: center;
+  margin: 0 auto;
 }
 
 .results {
@@ -551,23 +548,133 @@ label {
 .trained_labels_text{
   display: flex;
   flex-direction: column;
-  justify-content: left;
-  text-align: left;
-  font-weight: bolder;
+  justify-content: center;
+  font-weight: bold;
+  align-items: center;
+  margin: auto;
   color: #284B63;
   padding-left: 0.5em;
+  padding-bottom: 0.5em;
 }
 
-.trained_labels_text p {
+.trained_labels_text span {
   text-align: left;
-  padding-bottom: 0.5em;
   width: 100%;
 }
 
 .model_output {
   display: flex;
-  vertical-align: middle;
   justify-content: center;
+  vertical-align: middle;
   width: 100%;
-  overflow: hidden;
+  margin: 0 auto;
+  flex-shrink: 0;
+
+}
+
+.model_output table {
+  margin: 0;
+  flex-shrink: 0;
+  flex-grow: 0.9;
+}
+
+.download_div {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  justify-items: center;
+}
+
+.download_model {
+  height: 100%;
+  flex-shrink: 0;
+  flex-grow: 1;
+  font-size: 2vw;
+}
+
+.download_model a {
+  font-size: 2vw;
+}
+
+.download_model a:link, a:visited {
+  text-decoration: none;
+  color: white;
+}
+
+.download_model a:hover, a:active {
+  text-decoration: underline;
+  color: white;
+}
+
+.hovertext {
+  position: relative;
+}
+
+.hovertext:hover:before {
+  content: attr(data-hover);
+  visibility: hidden;
+  opacity: 0;
+  background-color: #3C6E71;
+  color: #fff;
+  font-size: 1vw;
+  text-align: center;
+  border-radius: 5px;
+  padding: 5px 0;
+  transition: opacity 0.5s ease-in-out;
+
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  top: 110%;
+}
+
+.hovertext:hover:after {
+  opacity: 1;
+  visibility: visible;
+}
+
+.test_input {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-items: center;
+  text-align: center;
+  width: 100%;
+  color: #284B63;
+  font-size: 2vw;
+  margin: 0 auto;
+}
+
+.test_input table {
+  display: none;
+}
+
+.text_input {
+  width: 20%;
+  box-sizing: border-box;
+  border: none;
+  border-bottom: 2px solid #353535;
+  font-size: 2vw;
+  color: #284B63;
+  background-color: #D9D9D9;
+  background-repeat: no-repeat;
+  padding: 1vw 0 0 .5vw;
+  margin-top: 2vw;
+  transition: width 0.4s ease-in-out;
+  text-align: center;
+  margin: 0.5em auto 2em;
+}
+
+.text_input:focus {
+  width: 70%;
+  border: none;
+  outline: none;
+  border-bottom: 2px solid #353535;
+  text-align: left;
+}
+
+#text_prediction_result th {
+  text-align: center;
 }

@@ -52,7 +52,7 @@
           -->
     </div>
 
-    <button class="show_charts">Show Charts</button>
+    <button class="btn show_charts">Show Charts</button>
     <div class="center center_select">
       <div class="wave"></div>
       <div class="wave"></div>
@@ -172,7 +172,6 @@
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 <script>
   let charts = ["Distribution","Text Length","Word Length","Bi-Grams"]
-
   createCheckBox({{features|safe}}, '.select_target', 'target', 'radio');
   createCheckBox({{features|safe}}, '.select_text', 'text', 'radio');
   createCheckBox(charts, '.select_charts', 'chart', 'checkbox');

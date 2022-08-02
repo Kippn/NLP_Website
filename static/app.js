@@ -60,7 +60,7 @@ function getBigrams(input) {
 function printLabels(labels) {
   div =  document.querySelector('.trained_labels_text');
   labels.forEach(l => {
-    p = document.createElement('p');
+    p = document.createElement('span');
     p.innerHTML = l;
     div.appendChild(p);
   })
@@ -159,7 +159,10 @@ $('.show_charts').click(function(event) {
   $('.center_select').css(
     "display", "flex"
   );
-  $('.labels_div').children('label').remove();
+  $('.labels_div').children('div').remove();
+  $('.models_div').children('div').remove();
+  $('.options_div').children('div').remove();
+
   $("html, body").animate({ scrollTop: $(document).height()-$(window).height() });
   target = document.querySelectorAll('#target');
   text = document.querySelectorAll('#text');
@@ -196,18 +199,43 @@ $('.show_charts').click(function(event) {
     $('.center_select').hide()
     $('.chart_div').css('display', 'flex')
     $('.model_div').css('display', 'grid')
+
     if(data.hasOwnProperty('dist')){
       getChartDistribution(JSON.parse(data['dist']));
+    } else {
+      elem = document.getElementById('chartDistribution');
+      while (elem.firstChild) {
+        elem.removeChild(elem.lastChild);
+      }
     }
+
     if(data.hasOwnProperty('textLength')){
       getChartTextLength(JSON.parse(data['textLength']));
+    }else {
+      elem = document.getElementById('chartTextLength');
+      while (elem.firstChild) {
+        elem.removeChild(elem.lastChild);
+      }
     }
+
     if(data.hasOwnProperty('wordLength')){
       getChartWordLength(JSON.parse(data['wordLength']));
+    }else {
+      elem = document.getElementById('chartWordLength');
+      while (elem.firstChild) {
+        elem.removeChild(elem.lastChild);
+      }
     }
+
     if(data.hasOwnProperty('bigram')){
       getBigrams(JSON.parse(data['bigram']));
+    }else {
+      elem = document.getElementById('chartBigrams');
+      while (elem.firstChild) {
+        elem.removeChild(elem.lastChild);
+      }
     }
+
     if(data.hasOwnProperty('labels')){
       models = ['SVM', 'Naive Bayes', 'Logistic Regression', 'Random Forest'];
       options = ['Tfidf-Vectorizer', 'N-Gram', 'GloVe', 'BERT'];
@@ -218,6 +246,47 @@ $('.show_charts').click(function(event) {
   });
   event.preventDefault();
 });
+
+/**
+ * send input text to backend and pass prediction to table
+ */
+$('.text_input').keyup(function() {
+  let text = $('input[name=text_input]').val();
+  if (text.length > 0) {
+    $('.test_input table').css('display', 'table');
+  } else {
+    $('.test_input table').css('display', 'none');
+  }
+  json_data = {"text":text};
+  $.ajax({
+    type: 'POST',
+    dataType : 'json',
+    contentType: 'application/json',
+    url: '/test_input',
+    data: JSON.stringify(json_data),
+    error: function(XMLHttpRequest, textStatus, errorThrown) {
+      console.log(errorThrown);
+    }
+  })
+  .done(function(data) {
+    $('#text_prediction_result').DataTable({
+      pagination: 'bootstrap',
+      filter: false,
+      paging: false,
+      info: false,
+      ordering: false,
+      data: data,
+      destroy: true,
+      pageLength: 10,
+      columns:[
+        {data:'Model'},
+        {data:'Prediction'}
+      ]
+    });
+    $("html, body").animate({ scrollTop: $(document).height()-$(window).height()},
+                            {duration: 600});
+    });
+  });
 
 
 
@@ -233,6 +302,19 @@ $('.model_output tbody tr').on({
   },
   mouseleave: function() {
     $('.model_output tbody tr').css('opacity', '1.0');
+  }
+});
+
+$('.col_heading level1').on({
+  mouseenter: function() {
+    let text = $(this).attr('class');
+    let colNumber = '.'+text.substr(text.length-4, text.length);
+    $('.level1').css('opacity', '0.6');
+    $('.data').css('opacity', '0.6');
+    $(colNumber).css('opacity', '1.0');
+  },
+  mouseleave: function() {
+    $('.model_output table').css('opacity', '1.0');
   }
 });
 
