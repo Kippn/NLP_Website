@@ -81,69 +81,35 @@
     <form method="POST" action="/view" class="model_form" enctype="multipart/form-data">
 
         <div class="labels_div">
-          <legend class="label_select">Select labels to train</legend>
+          <legend class="label_select">Select labels</legend>
           <span class="spacer"></span>
         </div>
 
         <div class="models_div">
           <legend class="model_select">Select ML Models</legend>
           <span class="spacer"></span>
-          <!--
-          <label class="checkbox_label label_SVM">
-            SVM
-            <input type="checkbox" name="model" id="model", value="SVM">
-            <span class="checkmark"></span>
-          </label>
-
-          <label class="checkbox_label label_Naive">
-            Naive Bayes
-            <input type="checkbox" name="model" id="model", value="Naive Bayes">
-            <span class="checkmark"></span>
-          </label>
-
-          <label class="checkbox_label label_LogisticRegression">
-            Logistic Regression
-            <input type="checkbox" name="model" id="model", value="Logistic Regression">
-            <span class="checkmark"></span>
-          </label>
-
-          <label class="checkbox_label label_RandomForest">
-            Random Forest
-            <input type="checkbox" name="model" id="model", value="Random Forest">
-            <span class="checkmark"></span>
-          </label>
-          -->
         </div>
 
         <div class="options_div">
           <legend class="option_select">Select Vectorizer</legend>
           <span class="spacer"></span>
-          <!--
-          <label class="checkbox_label label_Tfidf">
-            Tfidf-Vectorizer
-            <input type="checkbox" name="options" id="option", value="TfidfVectorizer">
-            <span class="checkmark"></span>
-          </label>
-
-          <label class="checkbox_label label_bi_gram">
-            N-Gram
-            <input type="checkbox" name="options" id="option", value="N-Gram">
-            <span class="checkmark"></span>
-          </label>
-
-          <label class="checkbox_label label_GloVe">
-            GloVe
-            <input type="checkbox" name="options" id="option", value="GloVe">
-            <span class="checkmark"></span>
-          </label>
-
-          <label class="checkbox_label label_BERT">
-            BERT
-            <input type="checkbox" name="options" id="option", value="BERT">
-            <span class="checkmark"></span>
-          </label>
-          -->
         </div>
+
+        <div class="average_div">
+          <legend class="average_select">Select Average</legend>
+          <span class="spacer"></span>
+        </div>
+
+        <div class="toggle_class_weight">
+          <p>weight classes</p>
+          <label class="toggler-wrapper">
+            <input type="checkbox" class="class_weight" name="class_weight" id="class_weight">
+            <div class="toggler-slider">
+              <div class="toggler-knob"></div>
+            </div>
+          </label>
+        </div>
+
         <label class="upload_button show_models">
           <i class="fa fa-cloud-upload"></i>
           <input type="submit" value="Show Models"/>

@@ -1,4 +1,7 @@
 # imports
+import random
+import time
+from itertools import combinations
 
 from flask import Flask, jsonify, render_template, request, session, send_file
 from flask_session import Session
@@ -16,6 +19,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.figure_factory import create_distplot
+
+import contractions
 import mkl
 
 from nltk import pos_tag
@@ -32,12 +37,11 @@ from sklearn import svm, naive_bayes
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.utils import class_weight
 
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 from collections import defaultdict
-
-from imblearn.combine import SMOTETomek
 
 import warnings
 
@@ -122,46 +126,38 @@ def showData():
         session['target'] = check_box_target
         session['text'] = check_box_text
         session.modified = True
+        if 'df' not in session or 'Distribution' not in session or 'Text Length' not in session or 'Word Length' not in session:
+            df = processText(check_box_text, uploaded_df).text_cleaning_df()
+            session['df'] = True
+        else:
+            df = uploaded_df
         charts = showCharts(uploaded_df, check_box_text, check_box_target)
-        df = processText(check_box_text, uploaded_df).text_cleaning_df()
         df.to_csv(data_file_path)
         #df.iloc[:1000].to_csv(data_file_path)
         out = {}
 
-        if 'Bi-Grams' in check_box_chart:
-            if 'bigram' in session:
-                bigram = session['bigram']
-            else:
-                bigram = showBigrams(df, check_box_text, check_box_target).plot_bigrams()
-                session['bigram'] = bigram
-            out.update({'bigram': bigram})
+        if check_box_chart:
+            for chart in check_box_chart:
+                if chart in session:
+                    chart_output = session.get(chart)
+                else:
+                    if chart == 'Bi-Grams':
+                        chart_output = showBigrams(df, check_box_text, check_box_target).plot_bigrams()
+                    if chart == 'Distribution':
+                        chart_output = charts.plotDistribution()
+                    if chart == 'Text Length':
+                        chart_output = charts.plotTextLength()
+                    if chart == 'Word Length':
+                        chart_output = charts.plotWordLength()
 
-        if 'Distribution' in check_box_chart:
-            if 'dist' in session:
-                dist = session['dist']
-            else:
-                dist = charts.plotDistribution()
-                session['dist'] = dist
-            out.update({'dist': dist})
+                session[chart] = chart_output
+                out.update({chart: chart_output})
 
-        if 'Text Length' in check_box_chart:
-            if 'textLength' in session:
-                textLength = session['textLength']
-            else:
-                textLength = charts.plotTextLength()
-                session['textLength'] = textLength
-            out.update({'textLength': textLength})
-
-        if 'Word Length' in check_box_chart:
-            if 'wordLength' in session:
-                wordLength = session['wordLength']
-            else:
-                wordLength = charts.plotWordLength()
-                session['wordLength'] = wordLength
-            out.update({'wordLength': wordLength})
-
-        labels = charts.getLabels()
-        out.update({'labels': labels})
+        if 'labels' in session:
+            out.update({'labels': session.get('labels')})
+        else:
+            labels = charts.getLabels()
+            out.update({'labels': labels})
 
         return out
     return jsonify({'error': 'Missing data!'})
@@ -175,11 +171,16 @@ def view():
     check_box_labels = request.form.getlist('label')
     check_box_models = request.form.getlist('model')
     check_box_options = request.form.getlist('option')
+    check_box_class_weight = request.form.getlist('class_weight')
+    check_box_average = request.form.getlist('average')
+    if len(check_box_class_weight) > 0:
+        check_box_class_weight = check_box_class_weight[0]
+    else:
+        check_box_class_weight = 'off'
     text = session.get('text', None)
     target = session.get('target', None)
 
-    models = trainModels(uploaded_df, text, target, check_box_labels, check_box_models,
-                         check_box_options)
+    models = trainModels(uploaded_df, text, target, check_box_labels, check_box_models, check_box_class_weight, average, check_box_options)
     model_pred = models.plotOutput()
 
     return render_template('view.html', model=model_pred.to_html(), labels=check_box_labels)
@@ -199,11 +200,10 @@ def predict_text():
 
     out = {}
     for file_name in models_file:
-        if 'GloVe' not in file_name:
-            model = pickle.load(open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'rb'))
-            prediction = ' '.join(Encoder.inverse_transform(model.predict(data)))
-            file_name = file_name.replace('.pkl', '')
-            out.update({file_name: prediction})
+        model = pickle.load(open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'rb'))
+        prediction = ' '.join(Encoder.inverse_transform(model.predict(data)))
+        file_name = file_name.replace('.pkl', '')
+        out.update({file_name: prediction})
     df = pd.DataFrame(list(out.items()))
     df.columns = ['Model', 'Prediction']
 
@@ -228,7 +228,7 @@ class showCharts:
         for label in self.labels:
             length = self.df[self.df[self.target] == label].shape[0]
             lengths.append(length)
-            percentage.append(f'{round((length / self.df.shape[0])*100,2)}%')
+            percentage.append(f'{round((length / self.df.shape[0]) * 100, 2)}%')
 
         d = {'labels': self.labels, 'samples': lengths, 'percentage': percentage}
         t = pd.DataFrame(d)
@@ -333,9 +333,11 @@ class showCharts:
 
 # text cleaning
 class processText:
-    def __init__(self, text, df=None):
+    def __init__(self, text, df=None, target=None):
         if df is not None:
             self.df = df.copy()
+        if target is not None:
+            self.target = target
         self.text = text
 
     @staticmethod
@@ -369,23 +371,34 @@ class processText:
         return re.sub(r'\brt\b', '', text)
 
     @staticmethod
+    def expand_contractions(text):
+        expanded_words = []
+        for word in text.split():
+            expanded_words.append(contractions.fix(word))
+        expanded_text = ' '.join(expanded_words)
+        return expanded_text
+
+    @staticmethod
     def stopword(text):
         text_tokens = word_tokenize(text)
         tokens_without_sw = [word for word in text_tokens if word not in stop]
         return " ".join(tokens_without_sw)
 
     def text_cleaning_df(self):
+        self.df[self.text] = [entry.lower() for entry in self.df[self.text]]
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_html(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_emoji(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_URL(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_rt(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.remove_punct(x))
+        self.df[self.text] = self.df[self.text].apply(lambda x: self.expand_contractions(x))
         self.df[self.text] = self.df[self.text].apply(lambda x: self.stopword(x))
         self.df.replace(to_replace=r'^s*$', value=np.nan, regex=True, inplace=True)
         self.df.replace(to_replace=r'^$', value=np.nan, regex=True, inplace=True)
         self.df.dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
         self.df = self.df.astype(str)
+
         return self.df
 
     def text_cleaning_sentence(self):
@@ -451,9 +464,31 @@ class showBigrams:
         return bigramsJSON
 
 
+class W2vVectorizer(object):
+
+    def __init__(self, w2v):
+        # Takes in a dictionary of words and vectors as input
+        self.w2v = w2v
+        if len(w2v) == 0:
+            self.dimensions = 0
+        else:
+            self.dimensions = len(w2v[next(iter(glove))])
+
+    # Note: Even though it doesn't do anything, it's required that this object implement a fit method or else
+    # it can't be used in a scikit-learn pipeline
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X):
+        return np.array([
+            np.mean([self.w2v[w] for w in words if w in self.w2v]
+                    or [np.zeros(self.dimensions)], axis=0) for words in X])
+
+
 # model training
 class trainModels:
-    def __init__(self, df, text, target, labels, models, options=['Tfidf-Vectorizer']):
+    def __init__(self, df, text, target, labels, models, weight_class, average, options=['Tfidf-Vectorizer']):
+        self.weight_class = weight_class
         self.y_test = None
         self.y_train = None
         self.X_test = None
@@ -464,13 +499,12 @@ class trainModels:
         self.labels = labels
         self.models = models
         self.options = options
+        self.average = average
 
     # further preprocess text -> tokenizer and lemmatizer
     def processText(self):
         self.df = self.df[self.df[self.target].isin(self.labels) == True]
-        self.df[self.text].dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
-        self.df[self.text] = [entry.lower() for entry in self.df[self.text]]
         self.df[self.text] = [word_tokenize(entry) for entry in self.df[self.text]]
         tag_map = defaultdict(lambda: wordnet.NOUN)
         tag_map['J'] = wordnet.ADJ
@@ -487,14 +521,17 @@ class trainModels:
 
     # train test split and vectorizer defining
     def prepareData(self):
-        X, y = [], []
+        # X, y = [], []
         self.processText()
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df['text_final'],
                                                                                 self.df[self.target],
                                                                                 test_size=0.2,
-                                                                                random_state=42)
-        self.y_train = Encoder.fit_transform(self.y_train)
-        self.y_test = Encoder.fit_transform(self.y_test)
+                                                                                random_state=42,
+                                                                                shuffle=True,
+                                                                                stratify=self.df[self.target])
+        Encoder.fit(self.y_train)
+        self.y_train = Encoder.transform(self.y_train)
+        self.y_test = Encoder.transform(self.y_test)
         vectorizer = {}
 
         if 'Tfidf-Vectorizer' in self.options:
@@ -506,170 +543,101 @@ class trainModels:
             vectorizer.update(t)
 
         if 'GloVe' in self.options:
-            corpus = self.df['text_final'].values
-            c_vectorizer = CountVectorizer()
-            X = c_vectorizer.fit_transform(corpus)
-            CountVectorizedData = pd.DataFrame(X.toarray(), columns=c_vectorizer.get_feature_names())
-            CountVectorizedData[self.target] = self.df[self.target]
-
-            # Defining an empty dictionary to store the values
-            GloveWordVectors = {}
-
-            # Defining a function which takes text input and returns one vector for each sentence
-            def FunctionText2Vec(inpTextData):
-                # Converting the text to numeric data
-                X = c_vectorizer.transform(inpTextData)
-                CountVecData = pd.DataFrame(X.toarray(), columns=c_vectorizer.get_feature_names())
-
-                # Creating empty dataframe to hold sentences
-                W2Vec_Data = pd.DataFrame()
-
-                # Looping through each row for the data
-                for i in range(CountVecData.shape[0]):
-                    # initiating a sentence with all zeros
-                    Sentence = np.zeros(50)
-
-                    # Looping through each word in the sentence and if its present in
-                    # the Glove model then storing its vector
-                    for word in WordsVocab[CountVecData.iloc[i, :] >= 1]:
-                        if word in GloveWordVectors.keys():
-                            Sentence = Sentence + GloveWordVectors[word]
-                    # Appending the sentence to the dataframe
-                    W2Vec_Data = W2Vec_Data.append(pd.DataFrame([Sentence]))
-                return W2Vec_Data
-
-            # Reading Glove Data
-            with open('static/files/glove.6B.50d.txt', 'r', encoding="utf-8") as f:
+            global glove
+            glove = {}
+            data = self.df['text_final'].map(word_tokenize).values
+            total_vocabulary = set(word for headline in data for word in headline)
+            with open('static/files/glove.6B.50d.txt', 'rb') as f:
                 for line in f:
-                    values = line.split()
-                    word = values[0]
-                    vector = np.array(values[1:], "float")
-                    GloveWordVectors[word] = vector
-
-            WordsVocab = CountVectorizedData.columns
-            W2Vec_Data = FunctionText2Vec(self.df['text_final'])
-
-            # Adding the target variable
-            W2Vec_Data.reset_index(inplace=True, drop=True)
-            W2Vec_Data[self.target] = CountVectorizedData[self.target]
-
-            # Assigning to DataForML variable
-            DataForML = W2Vec_Data
-            DataForML = DataForML.dropna()
-
-            # Separate Target Variable and Predictor Variables
-            TargetVariable = DataForML.columns[-1]
-            Predictors = DataForML.columns[:-1]
-
-            X = DataForML[Predictors].values
-            y = DataForML[TargetVariable].values
+                    parts = line.split()
+                    word = parts[0].decode('utf-8')
+                    if word in total_vocabulary:
+                        vector = np.array(parts[1:], dtype=np.float32)
+                        glove[word] = vector
+            t = {'GloVe': W2vVectorizer(glove)}
+            vectorizer.update(t)
 
         if 'BERT' in self.options:
             return
 
         for vec in vectorizer:
-            vectorizer[vec].fit(self.df['text_final'])
-        return vectorizer, X, y
+            if 'GloVe' not in vec:
+                vectorizer[vec].fit(self.df['text_final'])
+        return vectorizer
 
     # train Models
-    def trainPredictionModel(self, model, model_name, vectorizer, X_glove, y_glove):
+    def trainPredictionModel(self, model, model_name, vectorizer):
         output = {}
         models = []
+        labels_size = {}
+        for label in self.labels:
+            labels_size.update({label: self.df[self.df[self.target] == label].shape[0]})
+
+        temp = min(labels_size.values())
+        p_label = np.asarray([key for key in labels_size if labels_size[key] == temp]).reshape(1)
+        p_label = Encoder.transform(p_label)[0]
+
         for vec in vectorizer.keys():
-            X_train = vectorizer[vec].transform(self.X_train)
-            X_test = vectorizer[vec].transform(self.X_test)
-            pipe = Pipeline([
-                (vec, vectorizer[vec]),
-                (model_name, model)
-            ])
+            if 'GloVe' in vec:
+                pipe = Pipeline([
+                    (vec, vectorizer[vec]),
+                    ('scaler', PredictorScaler),
+                    (model_name, model.set_params())
+                ])
+            else:
+                pipe = Pipeline([
+                    (vec, vectorizer[vec]),
+                    (model_name, model)
+                ])
             pipe.fit(self.X_train, self.y_train)
 
-            # model.fit(X_train, self.y_train)
             file_name = model_name + ' ' + vec + '.pkl'
             with open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'wb') as f:
                 pickle.dump(pipe, f)
                 models.append(file_name)
 
-            # model = pickle.load(open(file_name,'rb'))
-
-            # pred = model.predict(X_test)
             pred = pipe.predict(self.X_test)
             output.update({(vec, 'Accuracy'): accuracy_score(self.y_test, pred)})
-            if len(self.labels) == 2:
-                output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average="binary")})
-                output.update({(vec, 'Recall'): recall_score(self.y_test, pred, average="binary")})
-                output.update({(vec, 'F1'): f1_score(self.y_test, pred, average="binary")})
-            else:
-                output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average="macro")})
-                output.update({(vec, 'Recall'): recall_score(self.y_test, pred, average="macro")})
-                output.update({(vec, 'F1'): f1_score(self.y_test, pred, average="macro")})
 
-        if len(X_glove) != 0:
-
-            # Storing the fit object for later reference
-            PredictorScalerFit = PredictorScaler.fit(X_glove)
-
-            # Generating the standardized values of X
-            X = PredictorScalerFit.transform(X_glove)
-
-            X_train, X_test, y_train, y_test = train_test_split(X, y_glove, test_size=0.2, random_state=42)
-
-            # Encoder = LabelEncoder()
-            y_train = Encoder.fit_transform(y_train)
-            y_test = Encoder.fit_transform(y_test)
-
-            pipe = Pipeline([
-                (model_name, model)
-            ])
-
-            pipe.fit(X_train, y_train)
-
-            file_name = model_name + ' ' + 'GloVe' + '.pkl'
-            with open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'wb') as f:
-                pickle.dump(pipe, f)
-                models.append(file_name)
-
-            pred = pipe.predict(X_test)
-            output.update({('GloVe', 'Accuracy'): accuracy_score(y_test, pred)})
-            if len(self.labels) == 2:
-                output.update({('GloVe', 'Precision'): precision_score(y_test, pred, average="binary")})
-                output.update({('GloVe', 'Recall'): recall_score(y_test, pred, average="binary")})
-                output.update({('GloVe', 'F1'): f1_score(y_test, pred, average="binary")})
-            else:
-                output.update({('GloVe', 'Precision'): precision_score(y_test, pred, average="macro")})
-                output.update({('GloVe', 'Recall'): recall_score(y_test, pred, average="macro")})
-                output.update({('GloVe', 'F1'): f1_score(y_test, pred, average="macro")})
+            output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average=self.average, pos_label=p_label)})
+            output.update({(vec, 'Recall'): recall_score(self.y_test, pred, average=self.average, pos_label=p_label)})
+            output.update({(vec, 'F1'): f1_score(self.y_test, pred, average=self.average, pos_label=p_label)})
 
         return output, models
 
     # use different models
     def train(self):
-        vectorized, X_glove, y_glove = self.prepareData()
+        vectorized = self.prepareData()
         output = {}
         models = []
+
+        if self.weight_class == 'on':
+            comp_class_weight = 'balanced'
+        else:
+            comp_class_weight = None
+
         if 'SVM' in self.models:
             output['SVM'], model_name = self.trainPredictionModel(
-                svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto'), 'SVM',
-                vectorized, X_glove, y_glove)
+                svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto', class_weight=comp_class_weight), 'SVM',
+                vectorized)
             models.extend(model_name)
 
         if 'Naive Bayes' in self.models:
             output['Naive Bayes'], model_name = self.trainPredictionModel(naive_bayes.MultinomialNB(), 'Naive Bayes',
-                                                                          vectorized,
-                                                                          X_glove, y_glove)
+                                                                          vectorized)
             models.extend(model_name)
 
         if 'Logistic Regression' in self.models:
-            output['Logistic Regression'], model_name = self.trainPredictionModel(LogisticRegression(),
-                                                                                  'Logistic Regression',
-                                                                                  vectorized, X_glove,
-                                                                                  y_glove)
+            output['Logistic Regression'], model_name = self.trainPredictionModel(
+                LogisticRegression(class_weight=comp_class_weight),
+                'Logistic Regression',
+                vectorized)
             models.extend(model_name)
 
         if 'Random Forest' in self.models:
             output['Random Forest'], model_name = self.trainPredictionModel(
-                RandomForestClassifier(n_estimators=100, random_state=100), 'Random Forest', vectorized, X_glove,
-                y_glove)
+                RandomForestClassifier(n_estimators=100, random_state=100, class_weight=comp_class_weight),
+                'Random Forest', vectorized)
             models.extend(model_name)
 
         session['trained_models'] = models
@@ -685,11 +653,12 @@ class trainModels:
         df = df.style.set_table_styles([
             {'selector': 'tr:hover', 'props': [('background-color', '#adb5bd'), ('background', '#adb5bd')]},
             {'selector': 'td:hover', 'props': [('background-color', '#284B63'), ('color', 'white')]},
-            {'selector': 'th:not(.index_name)', 'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.5vw'},
+            {'selector': 'th:not(.index_name)',
+             'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.5vw;'},
             {'selector': 'tr', 'props': 'line-height: 4vw'},
-            {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 2vw'},
-            {'selector': 'th.col_heading.level0', 'props': 'font-size: 1.5vw;'},
-            {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535; font-size: 1vw'},
+            {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 1.5vw;'},
+            {'selector': 'th.col_heading.level0', 'props': 'font-size: 2vw;'},
+            {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535; font-size: 1vw;'},
             {'selector': 'td,th', 'props': 'line-height: inherit; padding: 0 10px'}],
             overwrite=False) \
             .format('{:.2%}') \

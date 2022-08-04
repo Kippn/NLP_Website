@@ -200,8 +200,8 @@ $('.show_charts').click(function(event) {
     $('.chart_div').css('display', 'flex')
     $('.model_div').css('display', 'grid')
 
-    if(data.hasOwnProperty('dist')){
-      getChartDistribution(JSON.parse(data['dist']));
+    if(data.hasOwnProperty('Distribution')){
+      getChartDistribution(JSON.parse(data['Distribution']));
     } else {
       elem = document.getElementById('chartDistribution');
       while (elem.firstChild) {
@@ -209,8 +209,8 @@ $('.show_charts').click(function(event) {
       }
     }
 
-    if(data.hasOwnProperty('textLength')){
-      getChartTextLength(JSON.parse(data['textLength']));
+    if(data.hasOwnProperty('Text Length')){
+      getChartTextLength(JSON.parse(data['Text Length']));
     }else {
       elem = document.getElementById('chartTextLength');
       while (elem.firstChild) {
@@ -218,8 +218,8 @@ $('.show_charts').click(function(event) {
       }
     }
 
-    if(data.hasOwnProperty('wordLength')){
-      getChartWordLength(JSON.parse(data['wordLength']));
+    if(data.hasOwnProperty('Word Length')){
+      getChartWordLength(JSON.parse(data['Word Length']));
     }else {
       elem = document.getElementById('chartWordLength');
       while (elem.firstChild) {
@@ -227,8 +227,8 @@ $('.show_charts').click(function(event) {
       }
     }
 
-    if(data.hasOwnProperty('bigram')){
-      getBigrams(JSON.parse(data['bigram']));
+    if(data.hasOwnProperty('Bi-Grams')){
+      getBigrams(JSON.parse(data['Bi-Grams']));
     }else {
       elem = document.getElementById('chartBigrams');
       while (elem.firstChild) {
@@ -239,9 +239,11 @@ $('.show_charts').click(function(event) {
     if(data.hasOwnProperty('labels')){
       models = ['SVM', 'Naive Bayes', 'Logistic Regression', 'Random Forest'];
       options = ['Tfidf-Vectorizer', 'N-Gram', 'GloVe', 'BERT'];
+      average = ['binary', 'macro', 'micro']
       createCheckBox(JSON.parse(data['labels']), '.labels_div', 'label','checkbox');
       createCheckBox(models, '.models_div', 'model','checkbox');
       createCheckBox(options, '.options_div', 'option','checkbox');
+      createCheckBox(average, '.average_div', 'average', 'radio');
     }
   });
   event.preventDefault();
@@ -302,19 +304,6 @@ $('.model_output tbody tr').on({
   },
   mouseleave: function() {
     $('.model_output tbody tr').css('opacity', '1.0');
-  }
-});
-
-$('.col_heading level1').on({
-  mouseenter: function() {
-    let text = $(this).attr('class');
-    let colNumber = '.'+text.substr(text.length-4, text.length);
-    $('.level1').css('opacity', '0.6');
-    $('.data').css('opacity', '0.6');
-    $(colNumber).css('opacity', '1.0');
-  },
-  mouseleave: function() {
-    $('.model_output table').css('opacity', '1.0');
   }
 });
 
