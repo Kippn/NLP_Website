@@ -10,15 +10,25 @@
   <title>Document</title>
 </head>
 <body>
+
   <div class="model_result_div"> 
     <h2 class="results">Results of the prediction models</h2>
+
     <div class="trained_labels">
       <p>Trained Labels:</p>
       <div class="trained_labels_text"></div>
     </div>
+
     <div class="model_output" >
       {{model|safe}}
     </div>
+
+    <h2 class="results">Results of the cross validation</h2>
+
+    <div class="model_output cross_val" >
+      {{model_pred_cross_val|safe}}
+    </div>
+
     <div class="download_div">
       <p>
         <button class="btn download_model">
@@ -29,6 +39,7 @@
           </a>
         </button>
       </p>
+
       <div class="test_input">
         <p>Enter text to test the models:</p>
         <input type="text" name="text_input" class="text_input" placeholder="Test input..">
@@ -41,6 +52,7 @@
           </thead>
         </table>
       </div>
+
     </div>
 
   </div>

@@ -81,6 +81,7 @@ function printLabels(labels) {
  */
 function createCheckBox(labels, containerName, element, option) {
   let row = 0;
+  //if (element = 'average') checked = true;
   newName = document.createElement('div');
   document.querySelector(containerName).appendChild(newName);
   $(newName).css({
@@ -102,6 +103,9 @@ function createCheckBox(labels, containerName, element, option) {
     checkbox.name = element;
     checkbox.value = elem;
     checkbox.id = element;
+    if (elem == 'binary') {
+      $(checkbox).prop('checked', true);
+    } 
     checkbox.classList.add(element)
 
     const span = document.createElement('span');
@@ -146,12 +150,39 @@ function changeColorShowCSV() {
  * ajax to flask
  */
 $('.show_models').click(function() {
+  console.log('test');
   $('.center_model')
   .css(
     "display", "flex"
   );
   $("html, body").animate({ scrollTop: $(document).height()-$(window).height() });
 })
+
+
+/**
+ * check if more than two labels are selected and disable binary average method
+ */
+$('.labels_div').click(function(){
+  let count = 0;
+  boxes = document.querySelectorAll('#label');
+  console.log(boxes);
+  boxes.forEach(box => {
+    if (box.checked == true) count++;
+  });
+  if (count > 2) {
+    boxes_average = document.querySelectorAll('#average');
+    boxes_average.forEach(box => {
+      $('.average_div input[value="binary"]').prop('checked', false);
+      $('.average_div input[value="macro"]').prop('checked', true);
+      $('.average_div input[value="binary"]').attr('disabled', 'disabled');
+      $('.average_div input[value="binary"]').parent().find('span').addClass('disabled');  
+    });
+  } else {
+    $('.average_div input[type="radio"]').removeAttr('disabled');
+    $('.average_div span').removeClass('disabled');
+  }
+})
+
 
 $('.show_charts').click(function(event) {
   $('.chart_div').css('display', 'none')
@@ -162,6 +193,8 @@ $('.show_charts').click(function(event) {
   $('.labels_div').children('div').remove();
   $('.models_div').children('div').remove();
   $('.options_div').children('div').remove();
+  $('.average_div').children('div').remove();
+
 
   $("html, body").animate({ scrollTop: $(document).height()-$(window).height() });
   target = document.querySelectorAll('#target');
@@ -244,6 +277,8 @@ $('.show_charts').click(function(event) {
       createCheckBox(models, '.models_div', 'model','checkbox');
       createCheckBox(options, '.options_div', 'option','checkbox');
       createCheckBox(average, '.average_div', 'average', 'radio');
+      $('.options_div input[value="BERT"]').attr('disabled', 'disabled');
+      $('.options_div input[value="BERT"]').parent().find('span').addClass('disabled');  
     }
   });
   event.preventDefault();
@@ -290,7 +325,11 @@ $('.text_input').keyup(function() {
     });
   });
 
-
+  function outputUpdate(split) {
+    let lower = 100 - split;
+    document.querySelector('.train_test_split_lower').value = split + "%";
+    document.querySelector('.train_test_split_upper').value = lower + "%";
+  }
 
 
 

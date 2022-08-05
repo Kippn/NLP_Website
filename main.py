@@ -1,7 +1,5 @@
 # imports
-import random
-import time
-from itertools import combinations
+from statistics import mean
 
 from flask import Flask, jsonify, render_template, request, session, send_file
 from flask_session import Session
@@ -31,13 +29,12 @@ from nltk.stem import WordNetLemmatizer
 from werkzeug.utils import secure_filename
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+from sklearn.model_selection import train_test_split, cross_validate
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, make_scorer
 from sklearn import svm, naive_bayes
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.utils import class_weight
 
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
@@ -126,14 +123,15 @@ def showData():
         session['target'] = check_box_target
         session['text'] = check_box_text
         session.modified = True
-        if 'df' not in session or 'Distribution' not in session or 'Text Length' not in session or 'Word Length' not in session:
+        if 'df' not in session:
             df = processText(check_box_text, uploaded_df).text_cleaning_df()
+            df.to_csv(data_file_path)
+            #df.iloc[:1000].to_csv(data_file_path)
             session['df'] = True
         else:
             df = uploaded_df
+
         charts = showCharts(uploaded_df, check_box_text, check_box_target)
-        df.to_csv(data_file_path)
-        #df.iloc[:1000].to_csv(data_file_path)
         out = {}
 
         if check_box_chart:
@@ -172,18 +170,35 @@ def view():
     check_box_models = request.form.getlist('model')
     check_box_options = request.form.getlist('option')
     check_box_class_weight = request.form.getlist('class_weight')
-    check_box_average = request.form.getlist('average')
+    check_box_cross_val = request.form.getlist('cross_val')
+    check_box_average = request.form.getlist('average')[0]
+    slider_split = int(request.form.getlist('slider')[0]) / 100
+
     if len(check_box_class_weight) > 0:
         check_box_class_weight = check_box_class_weight[0]
     else:
         check_box_class_weight = 'off'
+
+    if len(check_box_cross_val) > 0:
+        check_box_cross_val = True
+    else:
+        check_box_class_weight = False
+
     text = session.get('text', None)
     target = session.get('target', None)
 
-    models = trainModels(uploaded_df, text, target, check_box_labels, check_box_models, check_box_class_weight, average, check_box_options)
-    model_pred = models.plotOutput()
+    models = trainModels(uploaded_df, text, target, check_box_labels, check_box_models, check_box_class_weight,
+                         check_box_average, slider_split, check_box_cross_val, check_box_options)
 
-    return render_template('view.html', model=model_pred.to_html(), labels=check_box_labels)
+    model_pred, model_pred_cross_val = models.plotOutput()
+    if model_pred_cross_val:
+        model_pred_cross_val = model_pred_cross_val.to_html()
+    else:
+        model_pred_cross_val = ""
+
+    return render_template('view.html', model=model_pred.to_html(),
+                           model_pred_cross_val=model_pred_cross_val,
+                           labels=check_box_labels)
 
 
 @app.route('/download')
@@ -487,7 +502,8 @@ class W2vVectorizer(object):
 
 # model training
 class trainModels:
-    def __init__(self, df, text, target, labels, models, weight_class, average, options=['Tfidf-Vectorizer']):
+    def __init__(self, df, text, target, labels, models, weight_class, average, split, crossValidate,
+                 options=['Tfidf-Vectorizer']):
         self.weight_class = weight_class
         self.y_test = None
         self.y_train = None
@@ -500,6 +516,8 @@ class trainModels:
         self.models = models
         self.options = options
         self.average = average
+        self.test_split = round(1 - split, 2)
+        self.crossValidate = crossValidate
 
     # further preprocess text -> tokenizer and lemmatizer
     def processText(self):
@@ -521,11 +539,10 @@ class trainModels:
 
     # train test split and vectorizer defining
     def prepareData(self):
-        # X, y = [], []
         self.processText()
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df['text_final'],
                                                                                 self.df[self.target],
-                                                                                test_size=0.2,
+                                                                                test_size=self.test_split,
                                                                                 random_state=42,
                                                                                 shuffle=True,
                                                                                 stratify=self.df[self.target])
@@ -568,8 +585,15 @@ class trainModels:
     # train Models
     def trainPredictionModel(self, model, model_name, vectorizer):
         output = {}
+        cross_output = {}
         models = []
         labels_size = {}
+        if self.average == 'binary':
+            ending = ''
+        else:
+            ending = '_' + self.average
+        scoring = ['accuracy', 'precision' + ending, 'recall' + ending, 'f1' + ending]
+
         for label in self.labels:
             labels_size.update({label: self.df[self.df[self.target] == label].shape[0]})
 
@@ -589,26 +613,34 @@ class trainModels:
                     (vec, vectorizer[vec]),
                     (model_name, model)
                 ])
+
+            if self.crossValidate:
+                scores = cross_validate(pipe, self.X_train, self.y_train, scoring=scoring)
+                for score in scoring:
+                    cross_output.update({(vec, score.partition('_')[0].capitalize()): mean(scores['test_' + score])})
+
             pipe.fit(self.X_train, self.y_train)
+            pred = pipe.predict(self.X_test)
 
             file_name = model_name + ' ' + vec + '.pkl'
             with open(os.path.join(app.config['MODEL_FOLDER'], file_name), 'wb') as f:
                 pickle.dump(pipe, f)
                 models.append(file_name)
 
-            pred = pipe.predict(self.X_test)
             output.update({(vec, 'Accuracy'): accuracy_score(self.y_test, pred)})
 
-            output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average=self.average, pos_label=p_label)})
+            output.update(
+                {(vec, 'Precision'): precision_score(self.y_test, pred, average=self.average, pos_label=p_label)})
             output.update({(vec, 'Recall'): recall_score(self.y_test, pred, average=self.average, pos_label=p_label)})
             output.update({(vec, 'F1'): f1_score(self.y_test, pred, average=self.average, pos_label=p_label)})
 
-        return output, models
+        return output, models, cross_output
 
     # use different models
     def train(self):
         vectorized = self.prepareData()
         output = {}
+        output_cross_val = {}
         models = []
 
         if self.weight_class == 'on':
@@ -617,36 +649,46 @@ class trainModels:
             comp_class_weight = None
 
         if 'SVM' in self.models:
-            output['SVM'], model_name = self.trainPredictionModel(
-                svm.SVC(C=1.0, kernel='linear', degree=3, gamma='auto', class_weight=comp_class_weight), 'SVM',
-                vectorized)
+            output['SVM'], model_name, output_cross_val['SVM'] = self.trainPredictionModel(svm.SVC(C=1.0,
+                                                                                                    kernel='linear',
+                                                                                                    degree=3,
+                                                                                                    gamma='auto',
+                                                                                                    class_weight=comp_class_weight),
+                                                                                            'SVM',
+                                                                                            vectorized)
             models.extend(model_name)
 
         if 'Naive Bayes' in self.models:
-            output['Naive Bayes'], model_name = self.trainPredictionModel(naive_bayes.MultinomialNB(), 'Naive Bayes',
-                                                                          vectorized)
+            output['Naive Bayes'], model_name, output_cross_val['Naive Bayes'] = self.trainPredictionModel(
+                naive_bayes.MultinomialNB(),
+                'Naive Bayes',
+                vectorized)
             models.extend(model_name)
 
         if 'Logistic Regression' in self.models:
-            output['Logistic Regression'], model_name = self.trainPredictionModel(
+            output['Logistic Regression'], model_name, output_cross_val['Logistic Regression'] = self.trainPredictionModel(
                 LogisticRegression(class_weight=comp_class_weight),
                 'Logistic Regression',
                 vectorized)
             models.extend(model_name)
 
         if 'Random Forest' in self.models:
-            output['Random Forest'], model_name = self.trainPredictionModel(
-                RandomForestClassifier(n_estimators=100, random_state=100, class_weight=comp_class_weight),
-                'Random Forest', vectorized)
+            output['Random Forest'], model_name, output_cross_val['Random Forest'] = self.trainPredictionModel(
+                RandomForestClassifier(n_estimators=100,
+                                       random_state=100,
+                                       class_weight=comp_class_weight),
+                'Random Forest',
+                vectorized)
             models.extend(model_name)
 
         session['trained_models'] = models
 
-        return output
+        return output, output_cross_val
 
     # return a table with the calculated metrics
     def plotOutput(self):
-        out = self.train()
+        out, out_cross_val = self.train()
+
         df = pd.DataFrame(out).T
         df.sort_index(inplace=True)
 
@@ -665,7 +707,27 @@ class trainModels:
             .apply(lambda x: ["background-color:#3C6E71;" if i == x.max() else "background-color: #D9D9D9;" for i in x],
                    axis=0)
 
-        return df
+        if self.crossValidate:
+            df_cross_val = pd.DataFrame(out_cross_val).T
+            df_cross_val.sort_index(inplace=True)
+            df_cross_val = df_cross_val.style.set_table_styles([
+                {'selector': 'tr:hover', 'props': [('background-color', '#adb5bd'), ('background', '#adb5bd')]},
+                {'selector': 'td:hover', 'props': [('background-color', '#284B63'), ('color', 'white')]},
+                {'selector': 'th:not(.index_name)',
+                 'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.5vw;'},
+                {'selector': 'tr', 'props': 'line-height: 4vw'},
+                {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 1.5vw;'},
+                {'selector': 'th.col_heading.level0', 'props': 'font-size: 2vw;'},
+                {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535; font-size: 1vw;'},
+                {'selector': 'td,th', 'props': 'line-height: inherit; padding: 0 10px'}],
+                overwrite=False) \
+                .format('{:.2%}') \
+                .apply(lambda x: ["background-color:#3C6E71;" if i == x.max() else "background-color: #D9D9D9;" for i in x],
+                       axis=0)
+        else:
+            df_cross_val = {}
+
+        return df, df_cross_val
 
 
 if __name__ == "__main__":

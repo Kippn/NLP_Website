@@ -100,15 +100,45 @@
           <span class="spacer"></span>
         </div>
 
-        <div class="toggle_class_weight">
-          <p>weight classes</p>
+        <div class="other_options">
+
+        <div class="toggle class_weight">
+          <p>Weight Classes</p>
+          <span class="spacer"></span>
+
           <label class="toggler-wrapper">
-            <input type="checkbox" class="class_weight" name="class_weight" id="class_weight">
+            <input type="checkbox"  name="class_weight" id="class_weight">
             <div class="toggler-slider">
               <div class="toggler-knob"></div>
             </div>
           </label>
         </div>
+
+        <div class="toggle cross_val">
+          <p>Cross Validate</p>
+          <span class="spacer"></span>
+
+          <label class="toggler-wrapper">
+            <input type="checkbox" name="cross_val" id="cross_val">
+            <div class="toggler-slider">
+              <div class="toggler-knob"></div>
+            </div>
+          </label>
+        </div>
+
+        <div class="split_slider">
+          <label class="train_test_label" for="slider">Train-Test-Split</label>
+          <span class="spacer"></span>
+
+          <input type="range" name="slider" id="slider" min="0" max="100" value="80" step="1" oninput="outputUpdate(value)">
+          <p id="train_size">Train Size</p><br>
+          <output for="slider" class="train_test_split_lower">80 %</output>
+          <p id="test_size">Test Size</p> <br>
+          <output for="slider" class="train_test_split_upper">20 %</output>
+        </div>
+      </div>
+
+
 
         <label class="upload_button show_models">
           <i class="fa fa-cloud-upload"></i>
