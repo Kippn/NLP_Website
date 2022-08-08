@@ -181,7 +181,7 @@ body, html{
 .headline {
     margin: 1em auto;
     padding: 0;
-    font-size: 5vw;
+    font-size: 4vw;
 }
 
 .second_headline {
@@ -205,10 +205,78 @@ body, html{
   margin: auto;
 }
 
+.file_options {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.file_options label {
+  font-size: 2vw;
+}
+
+.file_options .test_input {
+  width: 25%;
+}
+
+.seperator_option {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 25%;
+}
+
+.seperator_option input {
+  width: 50%;
+  font-size: 2vw;
+  text-align: center;
+  padding: .5vw;
+  margin: 0.5em auto 1em;
+}
+
+.header_option {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 25%;
+}
+
+.file_options select {
+  width: 50%;
+  font-size: 2vw;
+  text-align: center;
+  padding: .5vw;
+  margin: 0.5em auto 1em;
+}
+
+.quote_option {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 25%;
+}
+
+.encoding {
+  width: 70%;
+  text-align: center;
+}
+
+.encoding:focus {
+  width: 70%;
+  border: none;
+  outline: none;
+  border-bottom: 2px solid #353535;
+}
+
 .csv_upload_form {
     margin: 0 auto;
     padding: 0;
-    width: 15%;
+    width: 100%;
     text-align: center;
     justify-content: center;
     align-items: center;
@@ -217,7 +285,7 @@ body, html{
 .show_csv_form {
   margin: 0 auto;
   padding: 0;
-  width: 15%;
+  width: 100%;
   text-align: center;
   justify-content: center;
   align-items: center;
@@ -233,8 +301,8 @@ input[type="submit"] {
 
 .load_csv {
     background-color: #284B63;
-    margin: 0 auto;
-    margin-top: 1em;
+    margin: 1em;
+    width: 25%;
 }
 
 .load_csv:hover {
@@ -244,7 +312,8 @@ input[type="submit"] {
 
 .submit_csv {
     background-color: #353535;
-    margin: 1em auto;
+    margin-bottom: 1em;
+    width: 15%;
 }
 
 .submit_csv:hover {
@@ -254,6 +323,7 @@ input[type="submit"] {
 .show_csv {
   background-color: #353535;
   margin: auto;
+  width: 15%;
 }
 
 .show_csv:hover {
@@ -682,8 +752,8 @@ label {
   width: 100%;
   height: 2vw;
   background-color: transparent;
-  -webkit-transition: .2s;
-  transition: opacity .2s;
+  -webkit-transition: .8s;
+  transition: .3s;
 }
 
 #slider::-webkit-slider-thumb {
@@ -716,11 +786,12 @@ label {
 
 #slider::-moz-range-track:hover {
   background-color: #3C6E71;
+  transition: 0.3s;
 }
 
 #slider::-webkit-slider-runnable-track:hover {
   background-color: #3C6E71;
-
+  transition: 0.3s;
 }
 
 #train_size {
@@ -819,10 +890,9 @@ label {
 
 .model_output table {
   margin: 0;
+  width: 100%;
 }
 
-.cross_val {
-}
 
 .download_div {
   width: 100%;
@@ -895,14 +965,14 @@ label {
 
 .test_input table {
   display: none;
+  width: 100%;
 }
 
-.test_input table th {
+.test_input table.dataTable thead th, table.dataTable thead td {
   text-align: center;
 }
 
 .text_input {
-  width: 20%;
   box-sizing: border-box;
   border: none;
   border-bottom: 2px solid #353535;
@@ -913,11 +983,15 @@ label {
   padding: 1vw 0 0 .5vw;
   margin-top: 2vw;
   transition: width 0.4s ease-in-out;
-  text-align: center;
   margin: 0.5em auto 1em;
 }
 
-.text_input:focus {
+.prediction {
+  text-align: center;
+  width: 20%;
+}
+
+.prediction:focus {
   width: 70%;
   border: none;
   outline: none;

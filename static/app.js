@@ -150,7 +150,6 @@ function changeColorShowCSV() {
  * ajax to flask
  */
 $('.show_models').click(function() {
-  console.log('test');
   $('.center_model')
   .css(
     "display", "flex"
@@ -165,7 +164,6 @@ $('.show_models').click(function() {
 $('.labels_div').click(function(){
   let count = 0;
   boxes = document.querySelectorAll('#label');
-  console.log(boxes);
   boxes.forEach(box => {
     if (box.checked == true) count++;
   });
@@ -272,13 +270,11 @@ $('.show_charts').click(function(event) {
     if(data.hasOwnProperty('labels')){
       models = ['SVM', 'Naive Bayes', 'Logistic Regression', 'Random Forest'];
       options = ['Tfidf-Vectorizer', 'N-Gram', 'GloVe', 'BERT'];
-      average = ['binary', 'macro', 'micro']
+      average = ['binary', 'macro', 'micro', 'weighted', 'samples']
       createCheckBox(JSON.parse(data['labels']), '.labels_div', 'label','checkbox');
       createCheckBox(models, '.models_div', 'model','checkbox');
       createCheckBox(options, '.options_div', 'option','checkbox');
       createCheckBox(average, '.average_div', 'average', 'radio');
-      $('.options_div input[value="BERT"]').attr('disabled', 'disabled');
-      $('.options_div input[value="BERT"]').parent().find('span').addClass('disabled');  
     }
   });
   event.preventDefault();
@@ -333,6 +329,11 @@ $('.text_input').keyup(function() {
 
 
 
+
+
+
+
+  
 /**
  * hover style on model output table
  */
