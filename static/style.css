@@ -235,6 +235,7 @@ body, html{
   text-align: center;
   padding: .5vw;
   margin: 0.5em auto 1em;
+  height: 4vw;
 }
 
 .header_option {
@@ -242,15 +243,17 @@ body, html{
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 25%;
+  width: 20%;
 }
 
 .file_options select {
+  color: #284B63;
   width: 50%;
   font-size: 2vw;
   text-align: center;
   padding: .5vw;
   margin: 0.5em auto 1em;
+  height: 4vw;
 }
 
 .quote_option {
@@ -258,12 +261,21 @@ body, html{
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 25%;
+  width: 20%;
+}
+
+.index_option {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 20%;
 }
 
 .encoding {
   width: 70%;
   text-align: center;
+  height: 4vw;
 }
 
 .encoding:focus {
@@ -361,6 +373,10 @@ input[type="submit"] {
 .select_div h1 {
   text-align: center;
   font-size: 3vw;
+}
+
+.dataframe {
+  width: 100%;
 }
 
 .select_div .dataframe th {
@@ -893,7 +909,6 @@ label {
   width: 100%;
 }
 
-
 .download_div {
   width: 100%;
   display: flex;
@@ -957,6 +972,7 @@ label {
   justify-content: center;
   justify-items: center;
   text-align: center;
+  align-items: center;
   width: 100%;
   color: #284B63;
   font-size: 2vw;
@@ -972,6 +988,10 @@ label {
   text-align: center;
 }
 
+.prediction_form {
+  width: 100%;
+}
+
 .text_input {
   box-sizing: border-box;
   border: none;
@@ -984,11 +1004,13 @@ label {
   margin-top: 2vw;
   transition: width 0.4s ease-in-out;
   margin: 0.5em auto 1em;
+  border-radius: .5rem .5rem 0 0;
 }
 
 .prediction {
-  text-align: center;
   width: 20%;
+  text-align: left;
+  padding-right: 5vw;
 }
 
 .prediction:focus {
@@ -999,6 +1021,29 @@ label {
   text-align: left;
 }
 
+.prediction_button {
+  display: inline-block;
+	background: #3C6E71;
+  position: relative;
+  justify-self: center;
+	color: #D9D9D9;
+	font: inherit;
+	border: 0;
+	outline: 0;
+	padding: 0;
+	transition: all 200ms ease-in;
+	cursor: pointer;
+  border-radius: 0.5rem;
+  padding: 0.3vw 0.2vw 0.2vw 0.3vw;
+  right: 5vw;
+  bottom: 0.4vw;
+  text-align: center;
+  box-shadow: 3px 3px 5px 1px #353535;
+}
+
+.prediction_button:hover {
+  background: rgb(71, 131, 133)
+}
 #text_prediction_result {
   text-align: center;
   font-size: 1.5vw;

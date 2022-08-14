@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="{{ url_for('static', filename= 'style.css')}}">
-  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.css">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/jquery.dataTables.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename= 'style.css')}}">
   <title>Document</title>
 </head>
 <body>
 
   <div class="model_result_div"> 
-    <h2 class="results">Results of the prediction models</h2>
+    <h2 class="results prediction_headline">Results of the prediction models</h2>
 
     <div class="trained_labels">
       <p>Trained Labels:</p>
@@ -23,9 +23,9 @@
       {{model|safe}}
     </div>
 
-    <h2 class="results">Results of the cross validation</h2>
+    <h2 class="results cross_val_headline">Results of the cross validation</h2>
 
-    <div class="model_output cross_val" >
+    <div class="model_output cross_val">
       {{model_pred_cross_val|safe}}
     </div>
 
@@ -42,7 +42,10 @@
 
       <div class="test_input">
         <p>Enter text to test the models:</p>
-        <input type="text" name="text_input" class="text_input prediction" placeholder="Test input..">
+        <div class="prediction_form">
+          <input type="text" name="text_input" class="text_input prediction" placeholder="Test input..">
+          <button class="prediction_button">PREDICT</button>
+        </div>
         <table id="text_prediction_result" class="display">
           <thead>
             <tr>

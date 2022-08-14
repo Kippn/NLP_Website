@@ -1,8 +1,8 @@
 # imports
+import secrets
 from statistics import mean
 
-from flask import Flask, jsonify, render_template, request, session, send_file, flash, url_for
-from sklearn.compose import ColumnTransformer
+from flask import Flask, jsonify, render_template, request, session, send_file, flash
 from transformers import BertTokenizer, BertModel
 
 from flask_session import Session
@@ -16,29 +16,30 @@ import re
 import json
 import pickle
 import shutil
+import mkl
+import contractions
+
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.figure_factory import create_distplot
+
 from typing import Callable, List, Optional, Tuple
 from zeugma.embeddings import EmbeddingTransformer
 
-
-import contractions
-import mkl
-
+import nltk
 from nltk import pos_tag, PorterStemmer
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 
-from werkzeug.utils import secure_filename, redirect
+from werkzeug.utils import secure_filename
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split, cross_validate
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, make_scorer
-from sklearn import svm, naive_bayes, metrics
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+from sklearn import svm, naive_bayes
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
@@ -50,11 +51,11 @@ from collections import defaultdict
 
 import warnings
 
-# nltk.download('stopwords')
-# nltk.download('punkt')
-# nltk.download('wordnet')
-# nltk.download('omw-1.4')
-# nltk.download('averaged_perceptron_tagger')
+nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+nltk.download('averaged_perceptron_tagger')
 stop = set(stopwords.words('english'))
 nlp = spacy.load("en_core_web_lg")
 
@@ -94,6 +95,7 @@ def upload_file():
         file_seperator = request.form['seperator']
         file_header = request.form['header']
         file_quote = request.form['quote']
+        file_index = request.form['index']
 
         if not file_seperator:
             file_seperator = ','
@@ -109,12 +111,17 @@ def upload_file():
         else:
             file_header = 'infer'
 
+        if file_index == 'None':
+            file_index = None
+        else:
+            file_index = int(file_index)
+
         data_filename = secure_filename(uploaded_file.filename)
         data_test_filename = secure_filename(uploaded_test_file.filename)
 
         try:
             uploaded_file = pd.read_csv(uploaded_file, encoding=file_encoding, sep=file_seperator, quotechar=file_quote,
-                                        header=file_header, index_col=0)
+                                        header=file_header, index_col=file_index)
         except FileNotFoundError:
             uploaded_file = pd.read_csv(uploaded_file, encoding=file_encoding, sep=None)
         except:
@@ -124,7 +131,7 @@ def upload_file():
         if uploaded_test_file:
             try:
                 uploaded_test_file = pd.read_csv(uploaded_test_file, encoding=file_encoding, sep=file_seperator,
-                                                 quotechar=file_quote, header=file_header, index_col=0)
+                                                 quotechar=file_quote, header=file_header, index_col=file_index)
             except FileNotFoundError:
                 uploaded_test_file = pd.read_csv(uploaded_test_file, encoding=file_encoding, sep=None)
             except:
@@ -181,7 +188,7 @@ def showData():
         if 'df' not in session:
             df = processText(check_box_text, uploaded_df).text_cleaning_df()
             df.to_csv(data_file_path)
-            #df.iloc[:100].to_csv(data_file_path)
+            # df.iloc[:100].to_csv(data_file_path)
             session['df'] = True
         else:
             df = uploaded_df
@@ -257,12 +264,14 @@ def view():
                            labels=check_box_labels)
 
 
+# download trained model as pipelines with pickle
 @app.route('/download')
 def download_file():
     path = shutil.make_archive('models', 'zip', os.path.join(app.config['MODEL_FOLDER']))
     return send_file(path, as_attachment=True)
 
 
+# returns predicted label of the test input text
 @app.route('/test_input', methods=['POST'])
 def predict_text():
     data = request.json['text']
@@ -539,25 +548,6 @@ class showBigrams:
         return bigramsJSON
 
 
-def style_dataframe(df):
-    df = df.style.set_table_styles([
-        {'selector': 'tr:hover', 'props': [('background-color', '#adb5bd'), ('background', '#adb5bd')]},
-        {'selector': 'td:hover', 'props': [('background-color', '#284B63'), ('color', 'white')]},
-        {'selector': 'th:not(.index_name)',
-         'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.0vw;'},
-        {'selector': 'tr', 'props': 'line-height: 4vw'},
-        {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 1.0vw;'},
-        {'selector': 'th.col_heading.level0', 'props': 'font-size: 1.5vw;'},
-        {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535; font-size: 1vw;'},
-        {'selector': 'td,th', 'props': 'line-height: inherit; padding: 0 10px'}],
-        overwrite=False) \
-        .format('{:.2%}') \
-        .apply(lambda x: ["background-color:#3C6E71;" if i == x.max() else "background-color: #D9D9D9;" for i in x],
-               axis=0)
-
-    return df
-
-
 def lambda_replace(x):
     return x[0][:, 0, :].squeeze()
 
@@ -634,6 +624,30 @@ class trainModels:
         self.test_split = round(1 - split, 2)
         self.crossValidate = crossValidate
         self.df_test = df_test
+        self.metrics = {'Acc': 'Accuracy', 'Prec': 'Precision', 'Recall': 'Recall', 'F1': 'F1'}
+        if len(options) > 2:
+            self.metrics.update({'Acc': 'A'})
+            self.metrics.update({'Prec': 'P'})
+            self.metrics.update({'Recall': 'R'})
+
+    @staticmethod
+    def style_dataframe(df):
+        df = df.style.set_table_styles([
+            {'selector': 'tr:hover', 'props': [('background-color', '#adb5bd'), ('background', '#adb5bd')]},
+            {'selector': 'td:hover', 'props': [('background-color', '#284B63'), ('color', 'white')]},
+            {'selector': 'th:not(.index_name)',
+             'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.5vw;'},
+            {'selector': 'tr', 'props': 'line-height: 4vw'},
+            {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 1.5vw;'},
+            {'selector': 'th.col_heading.level0', 'props': 'font-size: 2.0vw;'},
+            {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535; font-size: 1vw;'},
+            {'selector': 'td,th', 'props': 'line-height: inherit; padding: 0 10px'}],
+            overwrite=False) \
+            .format('{:.2%}') \
+            .apply(lambda x: ["background-color:#3C6E71;" if i == x.max() else "background-color: #D9D9D9;" for i in x],
+                   axis=0)
+
+        return df
 
     # further preprocess text -> tokenizer and lemmatizer
     def processText(self):
@@ -746,10 +760,10 @@ class trainModels:
                 pickle.dump(pipe, f)
                 models.append(file_name)
 
-            output.update({(vec, 'Accuracy'): accuracy_score(self.y_test, pred)})
-            output.update({(vec, 'Precision'): precision_score(self.y_test, pred, average=self.average)})
-            output.update({(vec, 'Recall'): recall_score(self.y_test, pred, average=self.average, pos_label=p_label)})
-            output.update({(vec, 'F1'): f1_score(self.y_test, pred, average=self.average)})
+            output.update({(vec, self.metrics['Acc']): accuracy_score(self.y_test, pred)})
+            output.update({(vec, self.metrics['Prec']): precision_score(self.y_test, pred, average=self.average)})
+            output.update({(vec, self.metrics['Recall']): recall_score(self.y_test, pred, average=self.average, pos_label=p_label)})
+            output.update({(vec, self.metrics['F1']): f1_score(self.y_test, pred, average=self.average)})
 
         return output, models, cross_output
 
@@ -810,12 +824,12 @@ class trainModels:
         df = pd.DataFrame(out).T
         df.sort_index(inplace=True)
 
-        df_style = style_dataframe(df)
+        df_style = self.style_dataframe(df)
 
         if self.crossValidate:
             df_cross_val = pd.DataFrame(out_cross_val).T
             df_cross_val.sort_index(inplace=True)
-            df_cross_val_style = style_dataframe(df_cross_val)
+            df_cross_val_style = self.style_dataframe(df_cross_val)
         else:
             df_cross_val_style = {}
 
@@ -823,5 +837,5 @@ class trainModels:
 
 
 if __name__ == "__main__":
-    app.secret_key = "123"
+    app.secret_key = secrets.randbelow(999999)
     app.run(debug=True)

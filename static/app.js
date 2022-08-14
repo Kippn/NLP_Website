@@ -12,6 +12,11 @@ $(document).ready(function() {
     $('.select_text input[value="'+value+'"]').attr('disabled', 'disabled');
     $('.select_text input[value="'+value+'"]').parent().find('span').addClass('disabled');  
   });
+  if( !$.trim( $('.cross_val_headline').html() ).length ) {
+    $('.results').css('display','none');
+  } else {
+    $('.results').css('display','block');
+  }
 })
 
 
@@ -283,43 +288,74 @@ $('.show_charts').click(function(event) {
 /**
  * send input text to backend and pass prediction to table
  */
-$('.text_input').keyup(function() {
+$('.text_input').keyup(function(event) {
   let text = $('input[name=text_input]').val();
-  if (text.length > 0) {
-    $('.test_input table').css('display', 'table');
-  } else {
+  if (text.length == 0) {
     $('.test_input table').css('display', 'none');
   }
-  json_data = {"text":text};
-  $.ajax({
-    type: 'POST',
-    dataType : 'json',
-    contentType: 'application/json',
-    url: '/test_input',
-    data: JSON.stringify(json_data),
-    error: function(XMLHttpRequest, textStatus, errorThrown) {
-      console.log(errorThrown);
-    }
+
+  $('.prediction_button').click(function() {
+    json_data = {"text":text};
+    sendTestInput(json_data);
   })
-  .done(function(data) {
-    $('#text_prediction_result').DataTable({
-      pagination: 'bootstrap',
-      filter: false,
-      paging: false,
-      info: false,
-      ordering: false,
-      data: data,
-      destroy: true,
-      pageLength: 10,
-      columns:[
-        {data:'Model'},
-        {data:'Prediction'}
-      ]
-    });
-    $("html, body").animate({ scrollTop: $(document).height()-$(window).height()},
-                            {duration: 600});
-    });
+
+  var keycode = event.keyCode ? event.keyCode : event.which;
+  if(keycode == '13') {
+    json_data = {"text":text};
+    sendTestInput(json_data);
+  }
   });
+
+  
+  function sendTestInput(text) {
+    $('.test_input table').css('display', 'table');
+    $.ajax({
+      type: 'POST',
+      dataType : 'json',
+      contentType: 'application/json',
+      url: '/test_input',
+      data: JSON.stringify(text),
+      error: function(XMLHttpRequest, textStatus, errorThrown) {
+        console.log(errorThrown);
+      }
+      })
+      .done(function(data) {
+        let colors = ["#3c6e71", "#284b63", "#d9d9d9", "#eb5e28"];
+        const uniques = [...
+          new Set(data.map(
+            (obj) => {
+              return obj.Prediction
+            })
+          )];
+
+      $('#text_prediction_result').DataTable({
+        pagination: 'bootstrap',
+        filter: false,
+        paging: false,
+        info: false,
+        ordering: false,
+        data: data,
+        destroy: true,
+        pageLength: 10,
+        columns:[
+          {data:'Model'},
+          {data:'Prediction'}
+        ],
+        rowCallback: function(row, data) {
+          for(let i = 0; i < uniques.length; i++) {
+            if(data.Prediction == uniques[i]) {
+              $('td', row).css({
+                'background-color': colors[i],
+                'color': "#D9D9D9",
+              });
+            }
+          }
+        }
+      });
+      $("html, body").animate({scrollTop: $(document).height()-$(window).height()},
+                              {duration: 200});
+      });
+  }
 
   function outputUpdate(split) {
     let lower = 100 - split;
