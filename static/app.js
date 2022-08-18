@@ -101,7 +101,7 @@ function createCheckBox(labels, containerName, element, option) {
     const id = elem;
     const label = document.createElement('label');
     //label.setAttribute('for',id);
-    label.setAttribute('class', 'checkbox_label')
+    label.setAttribute('class', 'checkbox_label');
     
     const checkbox = document.createElement('input');
     checkbox.type = option;
@@ -111,14 +111,24 @@ function createCheckBox(labels, containerName, element, option) {
     if (elem == 'binary') {
       $(checkbox).prop('checked', true);
     } 
-    checkbox.classList.add(element)
+    checkbox.classList.add(element);
 
     const span = document.createElement('span');
     span.setAttribute('class', 'checkmark');
 
     label.appendChild(document.createTextNode(elem));
-    label.appendChild(checkbox);
-    label.appendChild(span);
+    if(element=='label') {
+      a = document.createElement('a');
+      a.setAttribute('data-toggle', 'tooltip');
+      a.appendChild(checkbox);
+      a.appendChild(span);
+      label.appendChild(a);
+    } else {
+      label.appendChild(checkbox);
+      label.appendChild(span);
+    }
+
+    
 
     newName.appendChild(label);
     $(label).css(
@@ -147,13 +157,21 @@ function changeColorShowCSV() {
   $(".show_csv").removeClass('block_click')
 }
 
-
+function hideTooltip(element) {
+  setTimeout(function() {
+    $('a[data-toggle="tooltip"]').tooltip({
+      animated: 'fade',
+      title: '',
+    }).tooltip('dispose');
+  }, 2000);
+}
 
 
 
 /**
  * ajax to flask
  */
+
 $('.show_models').click(function() {
   $('.center_model')
   .css(
@@ -280,6 +298,48 @@ $('.show_charts').click(function(event) {
       createCheckBox(models, '.models_div', 'model','checkbox');
       createCheckBox(options, '.options_div', 'option','checkbox');
       createCheckBox(average, '.average_div', 'average', 'radio');
+      $('.label').click(function() {
+        let val = $(this).val();
+        if(!$(this).prop('checked')) {
+          if(val.includes('pos_label')) {
+            $(this).prop("checked", false);
+            val = val.replace(' pos_label','');
+            $(this).val(val);
+            $(this).siblings('span').css('background-color', '#D9D9D9');
+            $('a[data-toggle="tooltip"]').tooltip({
+              title: 'no positive label selected.',
+              animated: 'fade',
+              placement: 'right',
+              trigger: 'click',
+              container: 'body',
+            });
+            hideTooltip(this);
+          } else {
+            $(this).prop("checked", true);
+            val_new = val + ' pos_label';
+            $(this).val(val_new);
+            $(this).siblings('span').css('background-color', '#3C6E71');
+            $('a[data-toggle="tooltip"]').tooltip({
+              title: val + ' selected as positive label.',
+              animated: 'fade',
+              placement: 'right',
+              trigger: 'click',
+              container: 'body',
+            });
+            hideTooltip(this);
+          }
+        } else {
+          $('a[data-toggle="tooltip"]').tooltip({
+            title: 'click one more time to select as positive label.',
+            animated: 'fade',
+            placement: 'right',
+            trigger: 'click',
+            container: 'body',
+          });
+          hideTooltip(this);
+          $(this).siblings('span').css('background-color', '#284B63');
+        }
+      })
     }
   });
   event.preventDefault();
@@ -320,7 +380,7 @@ $('.text_input').keyup(function(event) {
       }
       })
       .done(function(data) {
-        let colors = ["#3c6e71", "#284b63", "#d9d9d9", "#eb5e28"];
+        let colors = ["#3c6e71", "#284b63", "#eb5e28", "#d9d9d9"];
         const uniques = [...
           new Set(data.map(
             (obj) => {

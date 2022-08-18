@@ -79,6 +79,9 @@ PredictorScaler = MinMaxScaler()
 # flask index route
 @app.route('/')
 def index():
+    """
+    :return:
+    """
     session.clear()
     return render_template('index.html')
 
@@ -86,8 +89,11 @@ def index():
 # upload and safe .csv file in directory
 @app.route('/', methods=['POST'])
 def upload_file():
+    """
+
+    :return:
+    """
     if request.form:
-        # upload file
         uploaded_file = request.files['file_main']
         uploaded_test_file = request.files['file_test']
 
@@ -188,7 +194,6 @@ def showData():
         if 'df' not in session:
             df = processText(check_box_text, uploaded_df).text_cleaning_df()
             df.to_csv(data_file_path)
-            # df.iloc[:100].to_csv(data_file_path)
             session['df'] = True
         else:
             df = uploaded_df
@@ -236,9 +241,18 @@ def view():
     check_box_cross_val = request.form.get('cross_val')
     check_box_average = request.form.getlist('average')[0]
     slider_split = int(request.form.get('slider')) / 100
+    pos_label = 1
 
     text = session.get('text', None)
     target = session.get('target', None)
+
+    for i in range(len(check_box_labels)):
+        if "pos_label" in check_box_labels[i]:
+            check_box_labels[i] = check_box_labels[i].replace(' pos_label', '')
+            if pos_label != 1:
+                pos_label = 1
+                break
+            pos_label = check_box_labels[i]
 
     if check_box_class_weight == 'on':
         check_box_class_weight = True
@@ -251,7 +265,7 @@ def view():
         check_box_cross_val = False
 
     models = trainModels(uploaded_df, text, target, check_box_labels, check_box_models, check_box_class_weight,
-                         check_box_average, slider_split, check_box_cross_val, check_box_options)
+                         check_box_average, slider_split, check_box_cross_val,pos_label, check_box_options)
 
     model_pred, model_pred_cross_val = models.plotOutput()
     if model_pred_cross_val:
@@ -293,6 +307,12 @@ def predict_text():
 # calculate charts
 class showCharts:
     def __init__(self, df, text=0, target=0):
+        """
+
+        :param df: pandas Dataframe
+        :param text: text column in dataframe
+        :param target: target column in dataframe
+        """
         self.df = df
         self.color = ['#284B63', '#4D194D', '#d62828', '#7a0045', 'red', 'green', 'blue', 'yellow']
         if target != 0:
@@ -302,6 +322,9 @@ class showCharts:
             self.text = text
 
     def plotDistribution(self):
+        """
+        :return: data distribution per unique label of dataset as plotly json object
+        """
         lengths = []
         percentage = []
 
@@ -328,6 +351,9 @@ class showCharts:
         return distJSON
 
     def plotTextLength(self):
+        """
+        :return: average text length of the dataset (total amount of characters), as plotly json object
+        """
 
         fig = make_subplots(
             rows=1, cols=2,
@@ -381,6 +407,9 @@ class showCharts:
         return lengthJSON
 
     def plotWordLength(self):
+        """
+        :return: average word length (average amount of characters per word), as plotly json object
+        """
         hist_data = []
         self.df.dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
@@ -390,7 +419,6 @@ class showCharts:
 
         fig = create_distplot(hist_data, [str(x) for x in self.labels], bin_size=0.2, colors=self.color)
         fig.update_xaxes(title_text='length', range=[0, 10])
-        # fig.update_yaxes(title_text='probability density')
         fig.update_layout(title_text='Word length', legend=dict(orientation="h",
                                                                 yanchor="bottom",
                                                                 y=1.02,
@@ -406,15 +434,36 @@ class showCharts:
         return distplotJSON
 
     def getLabels(self):
+        """
+        :return: labels of dataset
+        """
         return pd.Series(self.labels).to_json(orient='values')
 
     def getFeatures(self):
+        """
+        :return: column names of dataset
+        """
         return pd.Series(self.df.columns.values).to_json(orient='values')
 
 
 # text cleaning
 class processText:
     def __init__(self, text, df=None, target=None):
+        """
+        clean text of single String or entire pandas DataFrame text column.
+            Elements to be removed: - URL
+                                    - HTML tags
+                                    -emojis
+                                    - punctuations
+                                    - twitter retweet symbols
+                                    - expansion of contractions
+                                    - remove of stopwords
+                                    - remove whitespace or empty text and replace with NaN
+                                    - drop NaN values and reset index
+        :param text: text column in dataframe or String if only one string need to be cleaned
+        :param df: pandas DataFrame
+        :param target: target column of dataframe
+        """
         if df is not None:
             self.df = df.copy()
         if target is not None:
@@ -503,6 +552,12 @@ class processText:
 # top bi-grams bar chart
 class showBigrams:
     def __init__(self, df, text, target):
+        """
+        calculate most frequent bi-grams per label of given dataframe and returns the charts as plotly json object
+        :param df: pandas DataFrame
+        :param text: text column of dataframe
+        :param target: target column of dataframe
+        """
         self.df = df
         self.target = target
         self.labels = df[self.target].unique()
@@ -549,17 +604,24 @@ class showBigrams:
 
 
 def lambda_replace(x):
+    """
+    helper function for bert transformer. Needed to be able to save bert transformer with plotly
+    :param x:
+    :return:
+    """
     return x[0][:, 0, :].squeeze()
 
 
 class BertTransformer(BaseEstimator, TransformerMixin):
-    def __init__(
-            self,
-            bert_tokenizer,
-            bert_model,
-            max_length: int = 60,
-            embedding_func: Optional[Callable[[torch.tensor], torch.tensor]] = None,
-    ):
+    def __init__(self, bert_tokenizer, bert_model, max_length: int = 60,
+                 embedding_func: Optional[Callable[[torch.tensor], torch.tensor]] = None):
+        """
+
+        :param bert_tokenizer:
+        :param bert_model:
+        :param max_length:
+        :param embedding_func:
+        """
         self.tokenizer = bert_tokenizer
         self.model = bert_model
         self.model.eval()
@@ -607,8 +669,21 @@ global bert_transformer
 
 # model training
 class trainModels:
-    def __init__(self, df, text, target, labels, models, weight_class, average, split, crossValidate,
+    def __init__(self, df, text, target, labels, models, weight_class, average, split, crossValidate, p_label,
                  options=['Tfidf-Vectorizer'], df_test=None):
+        """
+        :param df: pandas DataFrame
+        :param text: text column
+        :param target: target column
+        :param labels: list of labels to train
+        :param models: list of models such as SVM, Logistic Regression, ...
+        :param weight_class: boolean, sets sklearn function to weight classes. Used if dataset is unbalanced
+        :param average: average method for the metric functions
+        :param split: train-test-split distribution
+        :param crossValidate: boolean, cross-validate or not
+        :param options: list of transformers for the text
+        :param df_test: test dataframe
+        """
         self.weight_class = weight_class
         self.y_test = None
         self.y_train = None
@@ -624,22 +699,28 @@ class trainModels:
         self.test_split = round(1 - split, 2)
         self.crossValidate = crossValidate
         self.df_test = df_test
-        self.metrics = {'Acc': 'Accuracy', 'Prec': 'Precision', 'Recall': 'Recall', 'F1': 'F1'}
+        self.p_label = p_label
+        self.metrics = {'Accuracy': 'Accuracy', 'Precision': 'Precision', 'Recall': 'Recall', 'F1': 'F1'}
         if len(options) > 2:
-            self.metrics.update({'Acc': 'A'})
-            self.metrics.update({'Prec': 'P'})
+            self.metrics.update({'Accuracy': 'A'})
+            self.metrics.update({'Precision': 'P'})
             self.metrics.update({'Recall': 'R'})
 
     @staticmethod
     def style_dataframe(df):
+        """
+        applies defined styles to given DataFrame.
+        :param df: pandas DataFrame
+        :return: pandas Style object
+        """
         df = df.style.set_table_styles([
             {'selector': 'tr:hover', 'props': [('background-color', '#adb5bd'), ('background', '#adb5bd')]},
             {'selector': 'td:hover', 'props': [('background-color', '#284B63'), ('color', 'white')]},
             {'selector': 'th:not(.index_name)',
-             'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.5vw;'},
+             'props': 'background-color: #353535; color: white; text-align: center; font-size: 1.0vw;'},
             {'selector': 'tr', 'props': 'line-height: 4vw'},
             {'selector': 'th.col_heading', 'props': 'text-align: center; font-size: 1.5vw;'},
-            {'selector': 'th.col_heading.level0', 'props': 'font-size: 2.0vw;'},
+            {'selector': 'th.col_heading.level0', 'props': 'font-size: 1.5vw;'},
             {'selector': 'td', 'props': 'text-align: center; font-weight: bold; color: #353535; font-size: 1vw;'},
             {'selector': 'td,th', 'props': 'line-height: inherit; padding: 0 10px'}],
             overwrite=False) \
@@ -649,8 +730,11 @@ class trainModels:
 
         return df
 
-    # further preprocess text -> tokenizer and lemmatizer
     def processText(self):
+        """
+        # further preprocess text -> tokenizer and lemmatizer
+        :return: pandas DataFrame
+        """
         self.df = self.df[self.df[self.target].isin(self.labels)]
         ps = PorterStemmer()
         self.df[self.text] = [ps.stem(word) for word in self.df[self.text]]
@@ -674,6 +758,12 @@ class trainModels:
 
     # define train test split and vectorizer
     def prepareData(self):
+        """
+        train-test split of data
+        fit LabelEncoder
+        initialize text transformer
+        :return: List of text transformers
+        """
         self.processText()
         if not self.df_test:
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df['clean_text'],
@@ -689,6 +779,9 @@ class trainModels:
         Encoder.fit(self.y_train)
         self.y_train = Encoder.transform(self.y_train)
         self.y_test = Encoder.transform(self.y_test)
+        if self.p_label != 1:
+            p = np.asarray(self.p_label).reshape(1)
+            self.p_label = Encoder.transform(p)[0]
         vectorizer = {}
 
         if 'Tfidf-Vectorizer' in self.options:
@@ -717,22 +810,22 @@ class trainModels:
 
     # train Models
     def trainPredictionModel(self, model, model_name, vectorizer):
+        """
+        trains the model with each of the given text transformer and calculate the metrics
+        models and vectorizer are used in sklearn pipeline. These are saved with pickle and can be downloaded
+        :param model: classifier model
+        :param model_name: name of model as string
+        :param vectorizer: list of vectorizer
+        :return: dict of metrics, list of model and used vectorizer, and if uses cross-validation metrics
+        """
         output = {}
         cross_output = {}
         models = []
-        labels_size = {}
         if self.average == 'binary':
             ending = ''
         else:
             ending = '_' + self.average
         scoring = ['accuracy', 'precision' + ending, 'recall' + ending, 'f1' + ending]
-
-        for label in self.labels:
-            labels_size.update({label: self.df[self.df[self.target] == label].shape[0]})
-
-        temp = min(labels_size.values())
-        p_label = np.asarray([key for key in labels_size if labels_size[key] == temp]).reshape(1)
-        p_label = Encoder.transform(p_label)[0]
 
         for vec in vectorizer.keys():
             if model_name == 'Naive Bayes' and vec in ['GloVe', 'BERT']:
@@ -747,10 +840,10 @@ class trainModels:
                     (model_name, model)
                 ])
 
-            if self.crossValidate:
+            if self.crossValidate and vec is not 'BERT':
                 scores = cross_validate(pipe, self.X_train, self.y_train, scoring=scoring)
                 for score in scoring:
-                    cross_output.update({(vec, score.partition('_')[0].capitalize()): mean(scores['test_' + score])})
+                    cross_output.update({(vec, self.metrics[score.partition('_')[0].capitalize()]): mean(scores['test_' + score])})
 
             pipe.fit(self.X_train, self.y_train)
             pred = pipe.predict(self.X_test)
@@ -760,15 +853,20 @@ class trainModels:
                 pickle.dump(pipe, f)
                 models.append(file_name)
 
-            output.update({(vec, self.metrics['Acc']): accuracy_score(self.y_test, pred)})
-            output.update({(vec, self.metrics['Prec']): precision_score(self.y_test, pred, average=self.average)})
-            output.update({(vec, self.metrics['Recall']): recall_score(self.y_test, pred, average=self.average, pos_label=p_label)})
-            output.update({(vec, self.metrics['F1']): f1_score(self.y_test, pred, average=self.average)})
+            output.update({(vec, self.metrics['Accuracy']): accuracy_score(self.y_test, pred)})
+            output.update({(vec, self.metrics['Precision']): precision_score(self.y_test, pred, average=self.average, pos_label=self.p_label)})
+            output.update({(vec, self.metrics['Recall']): recall_score(self.y_test, pred, average=self.average, pos_label=self.p_label)})
+            output.update({(vec, self.metrics['F1']): f1_score(self.y_test, pred, average=self.average, pos_label=self.p_label)})
 
         return output, models, cross_output
 
     # use different models
     def train(self):
+        """
+        call trainPredictionModel for each selected model and put the model output from these function to one list
+        list is used to call the saved pickle objects
+        :return: dict of each model with every transformer applied on the text with the metrics
+        """
         vectorized = self.prepareData()
         output = {}
         output_cross_val = {}
@@ -819,6 +917,10 @@ class trainModels:
 
     # return a table with the calculated metrics
     def plotOutput(self):
+        """
+        puts the result of train function in pandas DataFrame and applies style
+        :return: pandas style object with the calculated metrics for each model and transformer
+        """
         out, out_cross_val = self.train()
 
         df = pd.DataFrame(out).T
