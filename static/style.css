@@ -674,7 +674,7 @@ label {
 }
 
 .toggler-wrapper input[type="checkbox"]:checked+.toggler-slider .toggler-knob {
-  left: calc(100% - 2vw + 3px);
+  left: calc(100% - 2vw + 5px);
   background-color: #3C6E71;
 }
 
@@ -712,11 +712,11 @@ label {
 }
 
 .toggler-wrapper .toggler-knob {
-  width: calc(2vw - 5px);
-  height: calc(2vw - 5px);
+  width: calc(2vw - 6px);
+  height: calc(2vw - 6px);
   border-radius: 50%;
   left: 1px;
-  top: 0px;
+  top: 1px;
   background-color: #353535;
 }
 

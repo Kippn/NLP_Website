@@ -12,10 +12,13 @@ $(document).ready(function() {
     $('.select_text input[value="'+value+'"]').attr('disabled', 'disabled');
     $('.select_text input[value="'+value+'"]').parent().find('span').addClass('disabled');  
   });
-  if( !$.trim( $('.cross_val_headline').html() ).length ) {
-    $('.results').css('display','none');
-  } else {
-    $('.results').css('display','block');
+  const d = document.querySelector('.cross_val');
+  if (d != null) {
+    if(d.childNodes.length > 1) {
+      $('.cross_val_headline').css('display','block');
+    } else {
+      $('.cross_val_headline').css('display','none');
+    }
   }
 })
 
@@ -52,7 +55,6 @@ function getBigrams(input) {
   chart = document.querySelector('#chartBigrams');
   Plotly.newPlot(chart,graphs,{});
 }
-
 
 
 

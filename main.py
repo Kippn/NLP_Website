@@ -95,7 +95,6 @@ def upload_file():
     """
     if request.form:
         uploaded_file = request.files['file_main']
-        uploaded_test_file = request.files['file_test']
 
         file_encoding = request.form['file_encoding']
         file_seperator = request.form['seperator']
@@ -123,7 +122,6 @@ def upload_file():
             file_index = int(file_index)
 
         data_filename = secure_filename(uploaded_file.filename)
-        data_test_filename = secure_filename(uploaded_test_file.filename)
 
         try:
             uploaded_file = pd.read_csv(uploaded_file, encoding=file_encoding, sep=file_seperator, quotechar=file_quote,
@@ -133,21 +131,6 @@ def upload_file():
         except:
             flash('Could not read file.')
             return render_template('index.html')
-
-        if uploaded_test_file:
-            try:
-                uploaded_test_file = pd.read_csv(uploaded_test_file, encoding=file_encoding, sep=file_seperator,
-                                                 quotechar=file_quote, header=file_header, index_col=file_index)
-            except FileNotFoundError:
-                uploaded_test_file = pd.read_csv(uploaded_test_file, encoding=file_encoding, sep=None)
-            except:
-                flash('Could not read file.')
-                return render_template('index.html')
-
-            uploaded_test_file.dropna(inplace=True)
-            uploaded_test_file.reset_index(drop=True, inplace=True)
-            uploaded_test_file.to_csv(os.path.join(app.config['UPLOAD_FOLDER'], data_test_filename))
-            session['uploaded_data_test_file_path'] = os.path.join(app.config['UPLOAD_FOLDER'], data_test_filename)
 
         uploaded_file.dropna(inplace=True)
         uploaded_file.reset_index(drop=True, inplace=True)
@@ -265,7 +248,7 @@ def view():
         check_box_cross_val = False
 
     models = trainModels(uploaded_df, text, target, check_box_labels, check_box_models, check_box_class_weight,
-                         check_box_average, slider_split, check_box_cross_val,pos_label, check_box_options)
+                         check_box_average, slider_split, check_box_cross_val, pos_label, check_box_options)
 
     model_pred, model_pred_cross_val = models.plotOutput()
     if model_pred_cross_val:
@@ -670,7 +653,7 @@ global bert_transformer
 # model training
 class trainModels:
     def __init__(self, df, text, target, labels, models, weight_class, average, split, crossValidate, p_label,
-                 options=['Tfidf-Vectorizer'], df_test=None):
+                 options=['Tfidf-Vectorizer']):
         """
         :param df: pandas DataFrame
         :param text: text column
@@ -682,7 +665,6 @@ class trainModels:
         :param split: train-test-split distribution
         :param crossValidate: boolean, cross-validate or not
         :param options: list of transformers for the text
-        :param df_test: test dataframe
         """
         self.weight_class = weight_class
         self.y_test = None
@@ -698,7 +680,6 @@ class trainModels:
         self.average = average
         self.test_split = round(1 - split, 2)
         self.crossValidate = crossValidate
-        self.df_test = df_test
         self.p_label = p_label
         self.metrics = {'Accuracy': 'Accuracy', 'Precision': 'Precision', 'Recall': 'Recall', 'F1': 'F1'}
         if len(options) > 2:
@@ -765,16 +746,12 @@ class trainModels:
         :return: List of text transformers
         """
         self.processText()
-        if not self.df_test:
-            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df['clean_text'],
-                                                                                    self.df[self.target],
-                                                                                    test_size=self.test_split,
-                                                                                    random_state=42,
-                                                                                    shuffle=True,
-                                                                                    stratify=self.df[self.target])
-        else:
-            self.X_train, self.y_train = self.df[self.text], self.df[self.target]
-            self.X_test, self.y_test = self.df_test[self.text], self.df_test[self.target]
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.df['clean_text'],
+                                                                                self.df[self.target],
+                                                                                test_size=self.test_split,
+                                                                                random_state=42,
+                                                                                shuffle=True,
+                                                                                stratify=self.df[self.target])
 
         Encoder.fit(self.y_train)
         self.y_train = Encoder.transform(self.y_train)
@@ -840,10 +817,11 @@ class trainModels:
                     (model_name, model)
                 ])
 
-            if self.crossValidate and vec is not 'BERT':
+            if self.crossValidate:
                 scores = cross_validate(pipe, self.X_train, self.y_train, scoring=scoring)
                 for score in scoring:
-                    cross_output.update({(vec, self.metrics[score.partition('_')[0].capitalize()]): mean(scores['test_' + score])})
+                    cross_output.update(
+                        {(vec, self.metrics[score.partition('_')[0].capitalize()]): mean(scores['test_' + score])})
 
             pipe.fit(self.X_train, self.y_train)
             pred = pipe.predict(self.X_test)
@@ -854,9 +832,12 @@ class trainModels:
                 models.append(file_name)
 
             output.update({(vec, self.metrics['Accuracy']): accuracy_score(self.y_test, pred)})
-            output.update({(vec, self.metrics['Precision']): precision_score(self.y_test, pred, average=self.average, pos_label=self.p_label)})
-            output.update({(vec, self.metrics['Recall']): recall_score(self.y_test, pred, average=self.average, pos_label=self.p_label)})
-            output.update({(vec, self.metrics['F1']): f1_score(self.y_test, pred, average=self.average, pos_label=self.p_label)})
+            output.update({(vec, self.metrics['Precision']): precision_score(self.y_test, pred, average=self.average,
+                                                                             pos_label=self.p_label)})
+            output.update({(vec, self.metrics['Recall']): recall_score(self.y_test, pred, average=self.average,
+                                                                       pos_label=self.p_label)})
+            output.update(
+                {(vec, self.metrics['F1']): f1_score(self.y_test, pred, average=self.average, pos_label=self.p_label)})
 
         return output, models, cross_output
 
