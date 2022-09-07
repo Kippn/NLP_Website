@@ -120,6 +120,7 @@ def upload_file():
             file_index = None
         else:
             file_index = int(file_index)
+        session[index] = file_index
 
         data_filename = secure_filename(uploaded_file.filename)
 
@@ -131,6 +132,7 @@ def upload_file():
         except:
             flash('Could not read file.')
             return render_template('index.html')
+
 
         uploaded_file.dropna(inplace=True)
         uploaded_file.reset_index(drop=True, inplace=True)
@@ -149,7 +151,9 @@ def select():
     data_file_path = session.get('uploaded_data_file_path', None)
 
     # read csv file in python flask (reading uploaded csv file from uploaded server location)
-    uploaded_df = pd.read_csv(data_file_path)
+    uploaded_df = pd.read_csv(data_file_path, index_col=None)
+    if 'Unnamed: 0' in uploaded_df.columns:
+        uploaded_df.drop('Unnamed: 0', axis=1, inplace=True)
 
     # pandas dataframe to html table flask
     uploaded_df_html = uploaded_df.head(10).to_html()
